@@ -5,12 +5,19 @@ import { interactionCreateHandler } from './interactionCreate';
 import { handleAutomodMessage } from '../services/automodService';
 import { handleMemberJoin, handleMemberLeave } from '../services/welcomeService';
 import { logError } from '../services/loggingService';
+import { isAutomaticBotActionsEnabled } from '../config/botRuntime';
 
+/**
+ * Event architecture is preserved. Automatic handlers no-op while
+ * AUTOMATIC_BOT_ACTIONS_ENABLED is false (development mode).
+ * InteractionCreate remains active for explicit user triggers.
+ */
 export function registerEvents(client: Client): void {
   client.once(Events.ClientReady, readyHandler);
   client.on(Events.InteractionCreate, interactionCreateHandler);
 
   client.on(Events.MessageCreate, async (message: Message) => {
+    if (!isAutomaticBotActionsEnabled()) return;
     try {
       await handleAutomodMessage(message);
     } catch (error) {
@@ -19,6 +26,7 @@ export function registerEvents(client: Client): void {
   });
 
   client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
+    if (!isAutomaticBotActionsEnabled()) return;
     try {
       await handleMemberJoin(member);
     } catch (error) {
@@ -27,6 +35,7 @@ export function registerEvents(client: Client): void {
   });
 
   client.on(Events.GuildMemberRemove, async (member: GuildMember | PartialGuildMember) => {
+    if (!isAutomaticBotActionsEnabled()) return;
     try {
       await handleMemberLeave(member);
     } catch (error) {

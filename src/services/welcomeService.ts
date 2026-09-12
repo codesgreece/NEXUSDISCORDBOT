@@ -7,6 +7,7 @@ import {
 import { BRAND } from '../config/serverStructure';
 import { getWelcomeSettings, type WelcomeSettings } from '../db/controlRepository';
 import { logEvent, logError } from './loggingService';
+import { isAutomaticBotActionsEnabled } from '../config/botRuntime';
 
 function parseColor(raw: string | undefined): number {
   if (!raw) return BRAND.accent;
@@ -43,6 +44,8 @@ async function resolveTextChannel(
 }
 
 export async function handleMemberJoin(member: GuildMember): Promise<void> {
+  // Development mode: join events must not send messages / assign roles.
+  if (!isAutomaticBotActionsEnabled()) return;
   const settings = getWelcomeSettings(member.guild.id);
   if (!settings.enabled) return;
 
@@ -94,6 +97,8 @@ export async function handleMemberJoin(member: GuildMember): Promise<void> {
 export async function handleMemberLeave(
   member: GuildMember | PartialGuildMember,
 ): Promise<void> {
+  // Development mode: leave events must not send messages.
+  if (!isAutomaticBotActionsEnabled()) return;
   const settings = getWelcomeSettings(member.guild.id);
   if (!settings.leaveEnabled) return;
 

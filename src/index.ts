@@ -4,12 +4,17 @@ import { deployCommands, registerCommandCollection } from './commands';
 import { registerEvents } from './events';
 import { startDashboardServer } from './dashboard/server';
 import { getDb } from './db';
-import { recordActivity } from './db/activityRepository';
+import { isAutomaticBotActionsEnabled } from './config/botRuntime';
 
 async function main(): Promise<void> {
   console.log('[BOOT] Starting NEXUS | DEVELOPMENT bot + dashboard...');
   console.log('[BOOT] Environment validated (secrets present, values hidden).');
+  console.log(
+    `[BOOT] Automatic bot actions: ${isAutomaticBotActionsEnabled() ? 'ENABLED' : 'DISABLED — wait for explicit slash/button/select/modal'}`,
+  );
 
+  // Schema open + migrations only. No Discord mutations, no activity logging,
+  // no shop/content sync, no setup on boot.
   getDb();
 
   const client = createBotClient();
@@ -17,6 +22,7 @@ async function main(): Promise<void> {
   registerEvents(client);
 
   try {
+    // Explicit boot step allowed: register/load slash commands with Discord.
     await deployCommands(config.token, config.clientId, config.guildId);
   } catch (error) {
     console.error('[BOOT] Failed to register slash commands:', error);
@@ -36,14 +42,6 @@ async function main(): Promise<void> {
   });
 
   startDashboardServer();
-
-  client.once('ready', () => {
-    recordActivity({
-      guildId: config.guildId,
-      action: 'Bot connected',
-      details: `Logged in as ${client.user?.tag ?? 'unknown'}`,
-    });
-  });
 
   await client.login(config.token);
 }

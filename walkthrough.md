@@ -1,21 +1,22 @@
-# Central Content + Discord Shop System
+# Development mode: zero automatic bot actions
 
-## What shipped
-One shared SQLite catalog for Dashboard + Discord. Products sync into **existing** channels (e.g. all Discord bots in `🤖・bots`) — **no per-product channels**, edit-or-create by stored message ID (no duplicates).
+## Behavior
+The bot stays connected and **only** executes:
 
-## Admin (Discord only after setup)
-- `/content` → Content Manager (Products / Sync / …)
-- `/shop-admin` → Product management
-- `/sync-shop` → Full shop sync into mapped channels
+- Slash commands
+- Buttons / selects / modals
+- Code we explicitly change via Cursor
 
-## Users
-- `/shop` → category → products
-- **Αγορά** on product embeds → confirm → order + purchase ticket
+`AUTOMATIC_BOT_ACTIONS_ENABLED = false` in `src/config/botRuntime.ts`.
 
-## Mapping
-Configurable in `src/config/contentMapping.ts` + `shop_categories` table (e.g. `DISCORD_BOTS` → `🤖・bots`).
+## Disabled (code kept)
+- Ready Discord mutations / presence / activity logging
+- AutoMod on `messageCreate`
+- Welcome / leave on member join/remove
+- No cron / setInterval workers / background sync loops found
 
-## Proof notes
-- Bot registers: `setup`, `content`, `shop`, `shop-admin`, `sync-shop`
-- Seeded **15** Discord Bot products into DB (Application Bot = Τιμή σύντομα)
-- Dashboard **Προϊόντα** shares the same DB + **Sync Discord** button
+## Still manual
+`/control` `/channels` `/roles` `/member` `/moderation` `/welcome` `/stats` `/backup` `/security` `/sync` `/shop` `/shop-admin` `/content` `/sync-shop` + all Control/Shop buttons
+
+## Build
+`npm run build` — success

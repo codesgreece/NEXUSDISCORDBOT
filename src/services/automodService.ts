@@ -13,6 +13,7 @@ import {
 import { kickMember } from './memberService';
 import { logEvent } from './loggingService';
 import { BRAND } from '../config/serverStructure';
+import { isAutomaticBotActionsEnabled } from '../config/botRuntime';
 
 const INVITE_RE = /discord(?:\.gg|app\.com\/invite|\.com\/invite)\/[a-zA-Z0-9-]+/i;
 const LINK_RE = /https?:\/\/\S+/i;
@@ -119,6 +120,8 @@ async function applyAction(
  * Requires GuildMessages + MessageContent intents when wired in the client.
  */
 export async function handleAutomodMessage(message: Message): Promise<boolean> {
+  // Development mode: never moderate from messageCreate without an explicit trigger path.
+  if (!isAutomaticBotActionsEnabled()) return false;
   if (!message.guild || message.author.bot) return false;
   if (!message.member) return false;
 
