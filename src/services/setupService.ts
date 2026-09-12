@@ -30,6 +30,12 @@ import {
   createWelcomeEmbed,
 } from '../utils/embeds';
 import { logEvent } from './loggingService';
+import {
+  MANAGED_EMBED_MARKERS,
+  publishManagedEmbed,
+  type ManagedEmbedKey,
+} from './managedEmbedService';
+import { getGuildConfig, updateGuildConfig } from '../db/guildConfigRepository';
 
 const REQUIRED_BOT_PERMISSIONS = [
   PermissionFlagsBits.ManageChannels,
@@ -313,61 +319,56 @@ async function applyStaffPermissions(guild: Guild): Promise<void> {
 }
 
 async function sendInformationEmbeds(guild: Guild): Promise<void> {
+  const config = getGuildConfig(guild.id);
+
   const targets: Array<{
     channelName: string;
-    marker: string;
-    send: (channel: TextChannel) => Promise<void>;
+    entityId: ManagedEmbedKey;
+    storedMessageId: string | null;
+    messageIdField:
+      | 'welcomeMessageId'
+      | 'rulesMessageId'
+      | 'servicesMessageId'
+      | 'pricingMessageId'
+      | 'ticketPanelMessageId';
+    embeds: () => ReturnType<typeof createWelcomeEmbed>[];
+    components?: () => ReturnType<typeof createTicketPanelButtons>;
   }> = [
     {
       channelName: '👋・welcome',
-      marker: 'NEXUS_WELCOME_EMBED',
-      send: async (channel) => {
-        await channel.send({
-          content: '<!-- NEXUS_WELCOME_EMBED -->',
-          embeds: [createWelcomeEmbed()],
-        });
-      },
+      entityId: 'welcome',
+      storedMessageId: config.welcomeMessageId,
+      messageIdField: 'welcomeMessageId',
+      embeds: () => [createWelcomeEmbed()],
     },
     {
       channelName: '📜・rules',
-      marker: 'NEXUS_RULES_EMBED',
-      send: async (channel) => {
-        await channel.send({
-          content: '<!-- NEXUS_RULES_EMBED -->',
-          embeds: [createRulesEmbed()],
-        });
-      },
+      entityId: 'rules',
+      storedMessageId: config.rulesMessageId,
+      messageIdField: 'rulesMessageId',
+      embeds: () => [createRulesEmbed()],
     },
     {
       channelName: '💼・services',
-      marker: 'NEXUS_SERVICES_EMBED',
-      send: async (channel) => {
-        await channel.send({
-          content: '<!-- NEXUS_SERVICES_EMBED -->',
-          embeds: [createServicesEmbed()],
-        });
-      },
+      entityId: 'services',
+      storedMessageId: config.servicesMessageId,
+      messageIdField: 'servicesMessageId',
+      embeds: () => [createServicesEmbed()],
     },
     {
       channelName: '💰・pricing',
-      marker: 'NEXUS_PRICING_EMBED',
-      send: async (channel) => {
-        await channel.send({
-          content: '<!-- NEXUS_PRICING_EMBED -->',
-          embeds: [createPricingEmbed()],
-        });
-      },
+      entityId: 'pricing',
+      storedMessageId: config.pricingMessageId,
+      messageIdField: 'pricingMessageId',
+      embeds: () => [createPricingEmbed()],
     },
     {
       channelName: '🎫・create-ticket',
-      marker: 'NEXUS_TICKET_PANEL',
-      send: async (channel) => {
-        await channel.send({
-          content: '<!-- NEXUS_TICKET_PANEL -->',
-          embeds: [createTicketPanelEmbed()],
-          components: createTicketPanelButtons(),
-        });
-      },
+      entityId: 'ticket',
+      storedMessageId: config.ticketPanelMessageId,
+      messageIdField: 'ticketPanelMessageId',
+      embeds: () => [createTicketPanelEmbed()],
+      components: () => createTicketPanelButtons(),
     },
   ];
 
@@ -375,19 +376,16 @@ async function sendInformationEmbeds(guild: Guild): Promise<void> {
     const channel = findTextChannelByName(guild, target.channelName);
     if (!channel) continue;
 
-    const alreadySent = await channelHasMarker(channel, target.marker);
-    if (alreadySent) continue;
+    const { message } = await publishManagedEmbed({
+      guildId: guild.id,
+      channel,
+      entityId: target.entityId,
+      embeds: target.embeds(),
+      components: target.components?.() ?? [],
+      storedMessageId: target.storedMessageId,
+      legacyMarker: MANAGED_EMBED_MARKERS[target.entityId],
+    });
 
-    await target.send(channel);
-    await sleep(300);
-  }
-}
-
-async function channelHasMarker(channel: TextChannel, marker: string): Promise<boolean> {
-  try {
-    const messages = await channel.messages.fetch({ limit: 30 });
-    return messages.some((msg) => msg.author.bot && msg.content.includes(marker));
-  } catch {
-    return false;
+    updateGuildConfig(guild.id, { [target.messageIdField]: message.id });
   }
 }
