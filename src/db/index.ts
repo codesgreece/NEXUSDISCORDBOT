@@ -142,6 +142,7 @@ function migrate(database: Database.Database): void {
   ensureShopProductColumns(database);
   seedShopCategories(database);
   seedShopProducts(database);
+  seedWebsiteProducts(database);
   backfillProductCategories(database);
   migrateControlCenterTables(database);
 }
@@ -262,7 +263,14 @@ function seedShopCategories(database: Database.Database): void {
     sort: number;
   }> = [
     { key: 'DISCORD_BOTS', name: 'Discord Bots', emoji: '🤖', channel: '🤖・bots', shop: 1, sort: 1 },
-    { key: 'WEBSITES', name: 'Websites', emoji: '🌐', channel: '🖥️・websites', shop: 1, sort: 2 },
+    {
+      key: 'WEBSITES',
+      name: 'Website Packages',
+      emoji: '🌐',
+      channel: '🖥️・websites',
+      shop: 1,
+      sort: 2,
+    },
     { key: 'DESIGNS', name: 'Designs', emoji: '🎨', channel: '🎨・designs', shop: 1, sort: 3 },
     { key: 'SERVICES', name: 'Services', emoji: '⚙️', channel: '💼・services', shop: 1, sort: 4 },
     { key: 'DIGITAL_PRODUCTS', name: 'Digital Products', emoji: '📦', channel: '📁・portfolio', shop: 1, sort: 5 },
@@ -464,6 +472,175 @@ function seedShopProducts(database: Database.Database): void {
   });
   tx();
   console.log(`[DB] Upserted ${products.length} Discord Bot shop products`);
+}
+
+/** Website Packages under existing WEBSITES category (channel 🖥️・websites). */
+function seedWebsiteProducts(database: Database.Database): void {
+  const now = new Date().toISOString();
+  const existing = database.prepare(
+    `SELECT id, name, description, price, active, sort_order FROM shop_products WHERE id = ?`,
+  );
+  const insert = database.prepare(`
+    INSERT INTO shop_products
+      (id, name, slug, emoji, description, price, category, image_url, active, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'WEBSITES', NULL, ?, ?, ?, ?)
+  `);
+  const update = database.prepare(`
+    UPDATE shop_products SET
+      name = ?,
+      slug = ?,
+      emoji = ?,
+      description = ?,
+      price = ?,
+      category = 'WEBSITES',
+      active = ?,
+      sort_order = ?,
+      updated_at = ?
+    WHERE id = ?
+  `);
+
+  const products: Array<{
+    id: string;
+    name: string;
+    emoji: string;
+    description: string;
+    price: number | null;
+    active: number;
+    sort: number;
+  }> = [
+    {
+      id: 'starter-website',
+      name: 'STARTER WEBSITE',
+      emoji: '🚀',
+      description: [
+        '~~175€~~ · 💰 100€ ΟΦΕΛΟΣ',
+        '✦ Έως 5 σελίδες',
+        '✦ Responsive σχεδιασμός',
+        '✦ Φόρμα επικοινωνίας',
+        '✦ Βασικό SEO',
+        '✦ Παράδοση σε συμφωνημένο χρόνο',
+      ].join('\n'),
+      price: 75,
+      active: 1,
+      sort: 1,
+    },
+    {
+      id: 'professional-website',
+      name: 'PROFESSIONAL WEBSITE',
+      emoji: '⭐',
+      description: [
+        '~~375€~~ · 💰 150€ ΟΦΕΛΟΣ',
+        '✦ Έως 10 σελίδες',
+        '✦ Custom UI/UX',
+        '✦ SEO Optimization',
+        '✦ Blog / Νέα',
+        '✦ Admin διαχείριση περιεχομένου',
+        '✦ Analytics Setup',
+      ].join('\n'),
+      price: 225,
+      active: 1,
+      sort: 2,
+    },
+    {
+      id: 'business-ecommerce',
+      name: 'BUSINESS / E-COMMERCE',
+      emoji: '🛒',
+      description: [
+        '~~1350€~~ · 💰 500€ ΟΦΕΛΟΣ',
+        '✦ Κατάλογος προϊόντων',
+        '✦ Καλάθι & παραγγελίες',
+        '✦ Admin Panel',
+        '✦ Πληρωμές κατόπιν συμφωνίας',
+        '✦ Responsive Design',
+        '✦ SEO & Performance',
+      ].join('\n'),
+      price: 850,
+      active: 1,
+      sort: 3,
+    },
+    {
+      id: 'custom-website-project',
+      name: 'CUSTOM PROJECT',
+      emoji: '⚙️',
+      description: [
+        'Custom λύση σχεδιασμένη αποκλειστικά γύρω από τις ανάγκες του project.',
+        '💬 Τιμή: Κατόπιν συνεννόησης',
+        '✦ Ανάλυση αναγκών',
+        '✦ Custom Architecture',
+        '✦ Web / Mobile Apps',
+        '✦ Admin Panels',
+        '✦ Συνεχής υποστήριξη',
+      ].join('\n'),
+      price: null,
+      active: 1,
+      sort: 4,
+    },
+  ];
+
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  const tx = database.transaction(() => {
+    for (const p of products) {
+      const row = existing.get(p.id) as
+        | {
+            id: string;
+            name: string;
+            description: string;
+            price: number | null;
+            active: number;
+            sort_order: number;
+          }
+        | undefined;
+
+      if (!row) {
+        insert.run(
+          p.id,
+          p.name,
+          p.id,
+          p.emoji,
+          p.description,
+          p.price,
+          p.active,
+          p.sort,
+          now,
+          now,
+        );
+        inserted += 1;
+        continue;
+      }
+
+      const same =
+        row.name === p.name &&
+        row.description === p.description &&
+        (row.price === null ? null : Number(row.price)) === p.price &&
+        Number(row.active) === p.active &&
+        Number(row.sort_order) === p.sort;
+
+      if (same) {
+        skipped += 1;
+        continue;
+      }
+
+      update.run(
+        p.name,
+        p.id,
+        p.emoji,
+        p.description,
+        p.price,
+        p.active,
+        p.sort,
+        now,
+        p.id,
+      );
+      updated += 1;
+    }
+  });
+  tx();
+  console.log(
+    `[DB] Website Packages products — inserted: ${inserted}, updated: ${updated}, skipped: ${skipped}`,
+  );
 }
 
 export function closeDb(): void {
