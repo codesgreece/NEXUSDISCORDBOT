@@ -166,39 +166,35 @@ You can run `/setup` again safely — existing roles/channels/embeds are skipped
 
 ## Production
 
-### Recommended: single Node host (bot + API + UI)
+### Production (bot + API + UI together) — Render
 
-Build and start on Railway, Render, Fly.io, or any Node 18+ host:
+Vercel cannot run the Discord bot. Deploy **everything** with Docker on Render:
+
+1. Push this repo → [Render](https://render.com) → **New** → **Blueprint** → select this repo (`render.yaml`)
+2. Fill env vars: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`
+3. After deploy, copy the service URL (e.g. `https://nexus-discord-bot.onrender.com`)
+4. Set:
+   - `DASHBOARD_ORIGIN=https://YOUR-SERVICE.onrender.com`
+   - `DISCORD_REDIRECT_URI=https://YOUR-SERVICE.onrender.com/api/auth/callback`
+5. Discord Developer Portal → OAuth2 → add that redirect URL
+6. Open the Render URL → **Login with Discord**
+
+Local production build:
 
 ```bash
 npm run build
 npm start
 ```
 
-Set production env vars (`DISCORD_*`, `SESSION_SECRET`, `DASHBOARD_ORIGIN`, `DISCORD_REDIRECT_URI`, etc.).  
-`npm start` serves the built React dashboard from the same origin as the API.
-
-Optional: register commands without starting the bot:
+Optional: register slash commands only:
 
 ```bash
 npm run register
 ```
 
-### Vercel dashboard (static UI)
+### Vercel (frontend only)
 
-This repo is configured so **Vercel builds only the Vite dashboard** (`vercel.json`).
-
-That fixes a bare project root 404. The Discord bot and Express API **cannot** run on Vercel (long-lived WebSocket + SQLite). Host them on a Node platform, then:
-
-1. In Vercel → Project → Environment Variables, set  
-   `VITE_API_BASE_URL=https://your-api-host.example.com`
-2. On the API host, set  
-   `DASHBOARD_ORIGIN=https://nexusdiscordbot.vercel.app`  
-   and add the matching OAuth redirect URL in the Discord Developer Portal
-3. Redeploy both sides
-
-If the UI and API share one host, leave `VITE_API_BASE_URL` unset (relative `/api` calls).
-
+`vercel.json` still builds the static dashboard. For login on Vercel you must also run the API on Render and set `VITE_API_BASE_URL` + `CROSS_ORIGIN_DASHBOARD=true`. Prefer the Render URL above — it serves UI + API + bot on one origin.
 ---
 
 ## Ticket system

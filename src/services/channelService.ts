@@ -3,6 +3,7 @@ import {
   GuildChannel,
   OverwriteResolvable,
   PermissionFlagsBits,
+  TextChannel,
 } from 'discord.js';
 import { getClient } from '../bot/client';
 import { recordActivity } from '../db/activityRepository';
@@ -112,7 +113,7 @@ export async function updateChannel(
     await channel.setPosition(input.position);
   }
   if (input.topic !== undefined && channel.type === ChannelType.GuildText) {
-    await channel.setTopic(input.topic);
+    await (channel as TextChannel).setTopic(input.topic);
   }
 
   recordActivity({

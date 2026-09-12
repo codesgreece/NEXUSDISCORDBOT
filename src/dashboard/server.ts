@@ -24,6 +24,9 @@ export function createDashboardApp() {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
+  // Set CROSS_ORIGIN_DASHBOARD=true when Vercel UI talks to a separate API host.
+  const crossSite = process.env.CROSS_ORIGIN_DASHBOARD === 'true';
+
   app.use(
     session({
       name: 'nexus.sid',
@@ -33,7 +36,7 @@ export function createDashboardApp() {
       store: new SqliteSessionStore(),
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: crossSite ? 'none' : 'lax',
         secure: config.isProd,
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
@@ -77,8 +80,8 @@ export function createDashboardApp() {
 
 export function startDashboardServer(): void {
   const app = createDashboardApp();
-  app.listen(config.port, () => {
-    console.log(`[DASHBOARD] API listening on http://localhost:${config.port}`);
+  app.listen(config.port, '0.0.0.0', () => {
+    console.log(`[DASHBOARD] API listening on http://0.0.0.0:${config.port}`);
     console.log(`[DASHBOARD] Frontend origin: ${config.dashboardOrigin}`);
   });
 }
