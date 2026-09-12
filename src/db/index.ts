@@ -58,7 +58,207 @@ function migrate(database: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions (expired);
+
+    CREATE TABLE IF NOT EXISTS shop_products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      price REAL,
+      active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS shop_orders (
+      id TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      user_tag TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      subtotal REAL,
+      total REAL,
+      currency TEXT NOT NULL DEFAULT 'EUR',
+      ticket_channel_id TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS shop_order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      product_emoji TEXT NOT NULL DEFAULT '',
+      unit_price REAL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      line_total REAL,
+      FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_shop_orders_guild
+      ON shop_orders (guild_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_shop_orders_user
+      ON shop_orders (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_shop_order_items_order
+      ON shop_order_items (order_id);
   `);
+
+  seedShopProducts(database);
+}
+
+function seedShopProducts(database: Database.Database): void {
+  const count = (
+    database.prepare('SELECT COUNT(*) AS c FROM shop_products').get() as { c: number }
+  ).c;
+  if (count > 0) return;
+
+  const now = new Date().toISOString();
+  const insert = database.prepare(`
+    INSERT INTO shop_products
+      (id, name, emoji, description, price, active, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `);
+
+  const products: Array<{
+    id: string;
+    name: string;
+    emoji: string;
+    description: string;
+    price: number | null;
+    sort: number;
+  }> = [
+    {
+      id: 'ticket-bot',
+      name: 'Ticket Bot',
+      emoji: '🎫',
+      description: 'Tickets, categories, transcripts, staff permissions',
+      price: 3.99,
+      sort: 1,
+    },
+    {
+      id: 'advanced-moderation',
+      name: 'Advanced Moderation',
+      emoji: '🛡️',
+      description: 'Anti-spam, anti-raid, warnings, bans, automod',
+      price: 5.99,
+      sort: 2,
+    },
+    {
+      id: 'welcome-bot',
+      name: 'Welcome Bot',
+      emoji: '👋',
+      description: 'Welcome messages, cards, roles, onboarding',
+      price: 2.99,
+      sort: 3,
+    },
+    {
+      id: 'giveaway-bot',
+      name: 'Giveaway Bot',
+      emoji: '🎁',
+      description: 'Giveaways, winners, requirements, reroll',
+      price: 2.99,
+      sort: 4,
+    },
+    {
+      id: 'server-stats',
+      name: 'Server Stats',
+      emoji: '📊',
+      description: 'Members, boosts, activity, channels, statistics',
+      price: 3.49,
+      sort: 5,
+    },
+    {
+      id: 'leveling-bot',
+      name: 'Leveling Bot',
+      emoji: '⭐',
+      description: 'XP, levels, ranks, rewards, leaderboard',
+      price: 3.99,
+      sort: 6,
+    },
+    {
+      id: 'economy-bot',
+      name: 'Economy Bot',
+      emoji: '💰',
+      description: 'Coins, daily rewards, shop, inventory, leaderboard',
+      price: 5.99,
+      sort: 7,
+    },
+    {
+      id: 'music-bot',
+      name: 'Music Bot',
+      emoji: '🎵',
+      description: 'Music player, queue, playlists',
+      price: 4.99,
+      sort: 8,
+    },
+    {
+      id: 'verification-bot',
+      name: 'Verification Bot',
+      emoji: '🔗',
+      description: 'Verification, buttons, role assignment',
+      price: 2.99,
+      sort: 9,
+    },
+    {
+      id: 'ai-bot',
+      name: 'AI Bot',
+      emoji: '🤖',
+      description: 'AI chat, server assistant, custom commands',
+      price: 7.99,
+      sort: 10,
+    },
+    {
+      id: 'notification-bot',
+      name: 'Notification Bot',
+      emoji: '📢',
+      description: 'YouTube/Twitch/TikTok/social notifications',
+      price: 4.99,
+      sort: 11,
+    },
+    {
+      id: 'discord-shop-bot',
+      name: 'Discord Shop Bot',
+      emoji: '🏪',
+      description: 'Products, orders, payments, automatic delivery',
+      price: 7.99,
+      sort: 12,
+    },
+    {
+      id: 'gaming-bot',
+      name: 'Gaming Bot',
+      emoji: '🎮',
+      description: 'Stats, profiles, game APIs, leaderboards',
+      price: 6.99,
+      sort: 13,
+    },
+    {
+      id: 'tournament-bot',
+      name: 'Tournament Bot',
+      emoji: '🏆',
+      description: 'Brackets, teams, matches, scores',
+      price: 6.99,
+      sort: 14,
+    },
+    {
+      id: 'application-bot',
+      name: 'Application Bot',
+      emoji: '📋',
+      description: 'Staff applications, forms, review system',
+      price: null,
+      sort: 15,
+    },
+  ];
+
+  const tx = database.transaction(() => {
+    for (const p of products) {
+      insert.run(p.id, p.name, p.emoji, p.description, p.price, p.sort, now, now);
+    }
+  });
+  tx();
+  console.log(`[DB] Seeded ${products.length} shop products`);
 }
 
 export function closeDb(): void {

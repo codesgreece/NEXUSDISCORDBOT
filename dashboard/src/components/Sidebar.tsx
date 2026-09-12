@@ -17,6 +17,10 @@ import {
   Plug,
   Lock,
   LogOut,
+  Store,
+  ShoppingCart,
+  Package,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -101,6 +105,13 @@ export function Sidebar({ guildId, onLogout, onNavigate }: SidebarProps) {
           <Item to={`${base}/bot/general`} icon={Bot} label="General" onNavigate={onNavigate} />
           <Item to={`${base}/bot/status`} icon={Activity} label="Status" onNavigate={onNavigate} />
           <Item to={`${base}/bot/logs`} icon={LogsIcon} label="Logs" onNavigate={onNavigate} />
+        </Section>
+
+        <Section title="Bot Shop">
+          <Item to={`${base}/shop`} icon={Store} label="Κατάστημα Bots" onNavigate={onNavigate} />
+          <Item to={`${base}/shop/cart`} icon={ShoppingCart} label="Καλάθι" onNavigate={onNavigate} />
+          <Item to={`${base}/shop/orders`} icon={ClipboardList} label="Παραγγελίες" onNavigate={onNavigate} />
+          <Item to={`${base}/shop/products`} icon={Package} label="Προϊόντα" onNavigate={onNavigate} />
         </Section>
 
         <Section title="System">

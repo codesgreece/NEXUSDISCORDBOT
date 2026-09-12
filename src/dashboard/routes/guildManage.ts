@@ -29,10 +29,12 @@ import { getGuildConfig, updateGuildConfig } from '../../db/guildConfigRepositor
 import { getClient } from '../../bot/client';
 import { TICKET_TYPES } from '../../config/serverStructure';
 import { listActivity } from '../../db/activityRepository';
+import { shopRouter } from './shop';
 
 export const guildManageRouter = Router({ mergeParams: true });
 
 guildManageRouter.use(requireAuth);
+guildManageRouter.use('/shop', shopRouter);
 
 type GuildReq = import('express').Request & {
   params: { guildId: string; channelId?: string; roleId?: string; userId?: string; kind?: string };

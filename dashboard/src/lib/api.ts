@@ -227,4 +227,98 @@ export const api = {
       webhooks: { status: string; note: string };
       oauth: { scopes: string[]; dashboardOrigin: string | null };
     }>(`/api/guilds/${guildId}/integrations`),
+
+  shopProducts: (guildId: string) =>
+    request<{ products: ShopProduct[] }>(`/api/guilds/${guildId}/shop/products`),
+  shopProductsManage: (guildId: string) =>
+    request<{ products: ShopProduct[] }>(`/api/guilds/${guildId}/shop/products/manage`),
+  createShopProduct: (
+    guildId: string,
+    body: {
+      name: string;
+      emoji?: string;
+      description?: string;
+      price?: number | null;
+      active?: boolean;
+      sortOrder?: number;
+      id?: string;
+    },
+  ) =>
+    request<{ product: ShopProduct }>(`/api/guilds/${guildId}/shop/products`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateShopProduct: (
+    guildId: string,
+    productId: string,
+    body: Partial<{
+      name: string;
+      emoji: string;
+      description: string;
+      price: number | null;
+      active: boolean;
+      sortOrder: number;
+    }>,
+  ) =>
+    request<{ product: ShopProduct }>(`/api/guilds/${guildId}/shop/products/${productId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteShopProduct: (guildId: string, productId: string) =>
+    request<{ ok: boolean }>(`/api/guilds/${guildId}/shop/products/${productId}`, {
+      method: 'DELETE',
+    }),
+  shopCheckout: (
+    guildId: string,
+    body: { items: Array<{ productId: string; quantity: number }>; notes?: string },
+  ) =>
+    request<{ order: ShopOrder; ticketChannelId: string }>(
+      `/api/guilds/${guildId}/shop/checkout`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  shopOrders: (guildId: string, scope: 'mine' | 'all' = 'mine') =>
+    request<{ orders: ShopOrder[] }>(
+      `/api/guilds/${guildId}/shop/orders?scope=${scope}`,
+    ),
+  shopOrder: (guildId: string, orderId: string) =>
+    request<{ order: ShopOrder }>(`/api/guilds/${guildId}/shop/orders/${orderId}`),
 };
+
+export interface ShopProduct {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  price: number | null;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShopOrderItem {
+  id: number;
+  orderId: string;
+  productId: string;
+  productName: string;
+  productEmoji: string;
+  unitPrice: number | null;
+  quantity: number;
+  lineTotal: number | null;
+}
+
+export interface ShopOrder {
+  id: string;
+  guildId: string;
+  userId: string;
+  userTag: string;
+  status: string;
+  subtotal: number | null;
+  total: number | null;
+  currency: string;
+  ticketChannelId: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: ShopOrderItem[];
+}

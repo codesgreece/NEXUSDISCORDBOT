@@ -1,6 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, Outlet } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { GuildProvider } from './hooks/useGuildSelection';
+import { CartProvider } from './hooks/useCart';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
@@ -17,6 +18,18 @@ import { BotStatusPage } from './pages/BotStatusPage';
 import { BotLogsPage } from './pages/BotLogsPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { SecurityPage } from './pages/SecurityPage';
+import { ShopPage } from './pages/ShopPage';
+import { ShopCartPage } from './pages/ShopCartPage';
+import { ShopOrdersPage } from './pages/ShopOrdersPage';
+import { ShopProductsPage } from './pages/ShopProductsPage';
+
+function ShopLayout() {
+  return (
+    <CartProvider>
+      <Outlet />
+    </CartProvider>
+  );
+}
 
 export default function App() {
   return (
@@ -47,6 +60,12 @@ export default function App() {
                 <Route path="bot/logs" element={<BotLogsPage />} />
                 <Route path="integrations" element={<IntegrationsPage />} />
                 <Route path="security" element={<SecurityPage />} />
+                <Route path="shop" element={<ShopLayout />}>
+                  <Route index element={<ShopPage />} />
+                  <Route path="cart" element={<ShopCartPage />} />
+                  <Route path="orders" element={<ShopOrdersPage />} />
+                  <Route path="products" element={<ShopProductsPage />} />
+                </Route>
               </Route>
             </Route>
 
