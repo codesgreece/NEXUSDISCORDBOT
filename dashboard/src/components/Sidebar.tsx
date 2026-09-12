@@ -23,6 +23,7 @@ import { useAuth } from '../hooks/useAuth';
 interface SidebarProps {
   guildId: string;
   onLogout: () => void;
+  onNavigate?: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -41,16 +42,19 @@ function Item({
   icon: Icon,
   label,
   soon,
+  onNavigate,
 }: {
   to: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   soon?: boolean;
+  onNavigate?: () => void;
 }) {
   return (
     <NavLink
       to={to}
       end
+      onClick={onNavigate}
       className={({ isActive }) =>
         `nav-link ${isActive ? 'nav-link-active' : ''} ${soon ? 'opacity-60' : ''}`
       }
@@ -66,12 +70,12 @@ function Item({
   );
 }
 
-export function Sidebar({ guildId, onLogout }: SidebarProps) {
+export function Sidebar({ guildId, onLogout, onNavigate }: SidebarProps) {
   const { user } = useAuth();
   const base = `/app/${guildId}`;
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-white/10 bg-[#0e1118]/80 backdrop-blur-xl">
+    <aside className="flex h-full w-72 flex-col border-r border-white/10 bg-[#0e1118] backdrop-blur-xl">
       <div className="border-b border-white/10 px-5 py-6">
         <p className="font-display text-xl font-bold tracking-tight text-white">NEXUS</p>
         <p className="text-xs font-medium uppercase tracking-[0.22em] text-nexus-purple">
@@ -80,37 +84,37 @@ export function Sidebar({ guildId, onLogout }: SidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-        <Item to={base} icon={LayoutDashboard} label="Dashboard" />
+        <Item to={base} icon={LayoutDashboard} label="Dashboard" onNavigate={onNavigate} />
 
         <Section title="Server">
-          <Item to={`${base}/overview`} icon={LayoutDashboard} label="Overview" />
-          <Item to={`${base}/channels`} icon={Hash} label="Channels" soon />
-          <Item to={`${base}/roles`} icon={Shield} label="Roles" soon />
-          <Item to={`${base}/members`} icon={Users} label="Members" soon />
+          <Item to={`${base}/overview`} icon={LayoutDashboard} label="Overview" onNavigate={onNavigate} />
+          <Item to={`${base}/channels`} icon={Hash} label="Channels" soon onNavigate={onNavigate} />
+          <Item to={`${base}/roles`} icon={Shield} label="Roles" soon onNavigate={onNavigate} />
+          <Item to={`${base}/members`} icon={Users} label="Members" soon onNavigate={onNavigate} />
         </Section>
 
         <Section title="Content">
-          <Item to={`${base}/welcome`} icon={Hand} label="Welcome" soon />
-          <Item to={`${base}/rules`} icon={ScrollText} label="Rules" soon />
-          <Item to={`${base}/services`} icon={Briefcase} label="Services" soon />
-          <Item to={`${base}/pricing`} icon={BadgeDollarSign} label="Pricing" soon />
+          <Item to={`${base}/welcome`} icon={Hand} label="Welcome" soon onNavigate={onNavigate} />
+          <Item to={`${base}/rules`} icon={ScrollText} label="Rules" soon onNavigate={onNavigate} />
+          <Item to={`${base}/services`} icon={Briefcase} label="Services" soon onNavigate={onNavigate} />
+          <Item to={`${base}/pricing`} icon={BadgeDollarSign} label="Pricing" soon onNavigate={onNavigate} />
         </Section>
 
         <Section title="Tickets">
-          <Item to={`${base}/tickets/settings`} icon={Settings2} label="Settings" soon />
-          <Item to={`${base}/tickets/categories`} icon={Tags} label="Categories" soon />
-          <Item to={`${base}/tickets/messages`} icon={MessageSquareText} label="Messages" soon />
+          <Item to={`${base}/tickets/settings`} icon={Settings2} label="Settings" soon onNavigate={onNavigate} />
+          <Item to={`${base}/tickets/categories`} icon={Tags} label="Categories" soon onNavigate={onNavigate} />
+          <Item to={`${base}/tickets/messages`} icon={MessageSquareText} label="Messages" soon onNavigate={onNavigate} />
         </Section>
 
         <Section title="Bot">
-          <Item to={`${base}/bot/general`} icon={Bot} label="General" soon />
-          <Item to={`${base}/bot/status`} icon={Activity} label="Status" soon />
-          <Item to={`${base}/bot/logs`} icon={LogsIcon} label="Logs" soon />
+          <Item to={`${base}/bot/general`} icon={Bot} label="General" soon onNavigate={onNavigate} />
+          <Item to={`${base}/bot/status`} icon={Activity} label="Status" soon onNavigate={onNavigate} />
+          <Item to={`${base}/bot/logs`} icon={LogsIcon} label="Logs" soon onNavigate={onNavigate} />
         </Section>
 
         <Section title="System">
-          <Item to={`${base}/integrations`} icon={Plug} label="Integrations" soon />
-          <Item to={`${base}/security`} icon={Lock} label="Security" soon />
+          <Item to={`${base}/integrations`} icon={Plug} label="Integrations" soon onNavigate={onNavigate} />
+          <Item to={`${base}/security`} icon={Lock} label="Security" soon onNavigate={onNavigate} />
         </Section>
       </nav>
 
