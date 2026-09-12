@@ -1,5 +1,6 @@
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { apiUrl } from '../lib/api';
 
 export function LoginPage() {
   const { user, loading } = useAuth();
@@ -30,7 +31,7 @@ export function LoginPage() {
         )}
 
         <a
-          href="/api/auth/discord"
+          href={apiUrl('/api/auth/discord')}
           className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#5865F2] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#4752c4]"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden>

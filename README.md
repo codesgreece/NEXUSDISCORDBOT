@@ -166,18 +166,38 @@ You can run `/setup` again safely — existing roles/channels/embeds are skipped
 
 ## Production
 
-Build and start:
+### Recommended: single Node host (bot + API + UI)
+
+Build and start on Railway, Render, Fly.io, or any Node 18+ host:
 
 ```bash
 npm run build
 npm start
 ```
 
+Set production env vars (`DISCORD_*`, `SESSION_SECRET`, `DASHBOARD_ORIGIN`, `DISCORD_REDIRECT_URI`, etc.).  
+`npm start` serves the built React dashboard from the same origin as the API.
+
 Optional: register commands without starting the bot:
 
 ```bash
 npm run register
 ```
+
+### Vercel dashboard (static UI)
+
+This repo is configured so **Vercel builds only the Vite dashboard** (`vercel.json`).
+
+That fixes a bare project root 404. The Discord bot and Express API **cannot** run on Vercel (long-lived WebSocket + SQLite). Host them on a Node platform, then:
+
+1. In Vercel → Project → Environment Variables, set  
+   `VITE_API_BASE_URL=https://your-api-host.example.com`
+2. On the API host, set  
+   `DASHBOARD_ORIGIN=https://nexusdiscordbot.vercel.app`  
+   and add the matching OAuth redirect URL in the Discord Developer Portal
+3. Redeploy both sides
+
+If the UI and API share one host, leave `VITE_API_BASE_URL` unset (relative `/api` calls).
 
 ---
 
@@ -225,20 +245,9 @@ Staff channels under `🔒 STAFF` are visible only to:
 ## Project structure
 
 ```
-src/
-  index.ts              # Boot: bot + dashboard API
-  bot/client.ts         # Shared Discord client
-  config.ts             # Env validation
-  register-commands.ts  # Standalone command deployer
-  commands/             # Slash commands
-  events/               # Discord event handlers
-  services/             # Shared business logic
-  utils/                # Helpers & embeds
-  config/               # Server structure definitions
-  db/                   # SQLite persistence layer
-  dashboard/            # Express API (OAuth, guilds, sessions)
-
-dashboard/              # React + Vite frontend
+src/                    # Discord bot + Express API
+dashboard/              # React + Vite frontend (deployed to Vercel)
+vercel.json             # Vercel build config for the dashboard
 ```
 
 ---
