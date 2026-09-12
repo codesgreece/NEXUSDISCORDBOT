@@ -472,7 +472,7 @@ function buildChannelsPanel(guild: Guild): { embed: EmbedBuilder; components: Ac
       [
         `Categories: **${listed.categories.length}** · Text: **${listed.text.length}** · Voice: **${listed.voice.length}**`,
         '',
-        'Δημιουργία / rename / lock / slowmode / delete με επιβεβαίωση.',
+        'Δημιουργία / rename / lock / slowmode / delete με επιβεβαίωση.\n🌐 Create Discord Servers Category = μόνο κατηγορία κάτω από 🤖 DISCORD BOTS (χωρίς channels).',
       ].join('\n'),
     );
   const components = [
@@ -491,6 +491,13 @@ function buildChannelsPanel(guild: Guild): { embed: EmbedBuilder; components: Ac
         .setCustomId(actionId('channel_create_cat'))
         .setLabel('Create Category')
         .setEmoji('📂')
+        .setStyle(ButtonStyle.Primary),
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(actionId('channel_create_discord_servers_cat'))
+        .setLabel('Create Discord Servers Category')
+        .setEmoji('🌐')
         .setStyle(ButtonStyle.Primary),
     ),
     new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
@@ -991,6 +998,22 @@ export async function handleControlButton(interaction: ButtonInteraction): Promi
             ),
           );
         await interaction.showModal(modal);
+        return;
+      }
+      case 'channel_create_discord_servers_cat': {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const result = await channelService.createDiscordServersCategory(guild.id, {
+            id: interaction.user.id,
+            tag: interaction.user.tag,
+          });
+          await interaction.editReply({ content: result.message });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          await interaction.editReply({
+            content: `❌ Failed to create **🌐 DISCORD SERVERS**: ${msg}`,
+          });
+        }
         return;
       }
       case 'channel_create_text':

@@ -52,6 +52,11 @@ export const ROLES: RoleDefinition[] = [
   { name: '🤖 Bot', color: 0x7289da, hoist: true, mentionable: false, position: 1 },
 ];
 
+
+/** Manual Control Center only — not created by /setup. */
+export const DISCORD_BOTS_CATEGORY_NAME = '🤖 DISCORD BOTS';
+export const DISCORD_SERVERS_CATEGORY_NAME = '🌐 DISCORD SERVERS';
+
 export const CATEGORIES: CategoryDefinition[] = [
   {
     name: '📌 INFORMATION',

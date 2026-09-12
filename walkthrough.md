@@ -1,22 +1,18 @@
-# Development mode: zero automatic bot actions
+# Manual category: 🌐 DISCORD SERVERS
+
+## What
+Control Center → Channel Manager → **🌐 Create Discord Servers Category**
 
 ## Behavior
-The bot stays connected and **only** executes:
+1. If `🌐 DISCORD SERVERS` exists → ephemeral notice, no duplicate, permissions unchanged
+2. If missing → create category only (no channels)
+3. Position immediately below `🤖 DISCORD BOTS`
+4. Apply category permission overwrites for @everyone / staff-admin / bot
 
-- Slash commands
-- Buttons / selects / modals
-- Code we explicitly change via Cursor
-
-`AUTOMATIC_BOT_ACTIONS_ENABLED = false` in `src/config/botRuntime.ts`.
-
-## Disabled (code kept)
-- Ready Discord mutations / presence / activity logging
-- AutoMod on `messageCreate`
-- Welcome / leave on member join/remove
-- No cron / setInterval workers / background sync loops found
-
-## Still manual
-`/control` `/channels` `/roles` `/member` `/moderation` `/welcome` `/stats` `/backup` `/security` `/sync` `/shop` `/shop-admin` `/content` `/sync-shop` + all Control/Shop buttons
+## Not done
+- No channels inside the new category
+- Not part of `/setup` or automatic sync
+- Does not modify `🤖 DISCORD BOTS` or other categories
 
 ## Build
 `npm run build` — success

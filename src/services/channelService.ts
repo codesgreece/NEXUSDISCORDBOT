@@ -1,5 +1,6 @@
 import {
   ChannelType,
+  Guild,
   GuildChannel,
   OverwriteResolvable,
   PermissionFlagsBits,
@@ -7,6 +8,14 @@ import {
 } from 'discord.js';
 import { getClient } from '../bot/client';
 import { recordActivity } from '../db/activityRepository';
+import { getRoleBindings } from '../db/controlRepository';
+import { findCategoryByName, getStaffRoles } from '../utils/discord';
+import {
+  DISCORD_BOTS_CATEGORY_NAME,
+  DISCORD_SERVERS_CATEGORY_NAME,
+} from '../config/serverStructure';
+
+export { DISCORD_BOTS_CATEGORY_NAME, DISCORD_SERVERS_CATEGORY_NAME };
 
 export function listChannels(guildId: string) {
   const guild = getClient().guilds.cache.get(guildId);
@@ -85,6 +94,148 @@ export async function createChannel(
   });
 
   return { id: channel.id, name: channel.name, type: input.type };
+}
+
+function buildDiscordServersCategoryOverwrites(guild: Guild): OverwriteResolvable[] {
+  const everyoneAllow = [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.AttachFiles,
+  ];
+
+  const staffAllow = [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.ManageMessages,
+    PermissionFlagsBits.ManageChannels,
+  ];
+
+  const botAllow = [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ManageMessages,
+    PermissionFlagsBits.ManageChannels,
+  ];
+
+  const overwrites: OverwriteResolvable[] = [
+    {
+      id: guild.id,
+      allow: everyoneAllow,
+    },
+  ];
+
+  const staffRoleIds = new Set<string>();
+  for (const role of getStaffRoles(guild)) {
+    staffRoleIds.add(role.id);
+  }
+
+  const bindings = getRoleBindings(guild.id);
+  for (const id of [bindings.adminRoleId, bindings.staffRoleId, bindings.moderatorRoleId]) {
+    if (id && guild.roles.cache.has(id)) staffRoleIds.add(id);
+  }
+
+  for (const role of guild.roles.cache.values()) {
+    if (role.id === guild.id) continue;
+    if (role.permissions.has(PermissionFlagsBits.Administrator)) {
+      staffRoleIds.add(role.id);
+    }
+  }
+
+  for (const roleId of staffRoleIds) {
+    overwrites.push({ id: roleId, allow: staffAllow });
+  }
+
+  const me = guild.members.me;
+  if (me) {
+    overwrites.push({ id: me.id, allow: botAllow });
+  }
+  if (bindings.botRoleId && guild.roles.cache.has(bindings.botRoleId)) {
+    overwrites.push({ id: bindings.botRoleId, allow: botAllow });
+  }
+
+  return overwrites;
+}
+
+/**
+ * Explicit Control Center action: create **only** `🌐 DISCORD SERVERS`.
+ * - No channels inside
+ * - No other categories touched
+ * - No duplicate if it already exists (permissions left unchanged)
+ * - Positioned immediately below `🤖 DISCORD BOTS`
+ */
+export async function createDiscordServersCategory(
+  guildId: string,
+  actor?: { id: string; tag: string },
+): Promise<{ created: boolean; id: string; name: string; message: string }> {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+
+  const existing = findCategoryByName(guild, DISCORD_SERVERS_CATEGORY_NAME);
+  if (existing) {
+    return {
+      created: false,
+      id: existing.id,
+      name: existing.name,
+      message: `ℹ️ Category **${DISCORD_SERVERS_CATEGORY_NAME}** already exists — no duplicate created and permissions were not reset.`,
+    };
+  }
+
+  const botsCategory = findCategoryByName(guild, DISCORD_BOTS_CATEGORY_NAME);
+  const overwrites = buildDiscordServersCategoryOverwrites(guild);
+
+  const category = await guild.channels.create({
+    name: DISCORD_SERVERS_CATEGORY_NAME,
+    type: ChannelType.GuildCategory,
+    permissionOverwrites: overwrites,
+    reason: `Manual Control Center create by ${actor?.tag ?? 'unknown'}`,
+  });
+
+  if (botsCategory) {
+    const childPositions: number[] = [];
+    for (const c of guild.channels.cache.values()) {
+      if (!('parentId' in c) || !('rawPosition' in c)) continue;
+      if (c.parentId !== botsCategory.id) continue;
+      childPositions.push((c as { rawPosition: number }).rawPosition);
+    }
+    const blockEnd = Math.max(
+      botsCategory.rawPosition,
+      ...(childPositions.length ? childPositions : [botsCategory.rawPosition]),
+    );
+    try {
+      await category.setPosition(blockEnd + 1, {
+        reason: `Place ${DISCORD_SERVERS_CATEGORY_NAME} below ${DISCORD_BOTS_CATEGORY_NAME}`,
+      });
+    } catch (error) {
+      console.warn(
+        `[CHANNELS] Created ${DISCORD_SERVERS_CATEGORY_NAME} but could not set position below ${DISCORD_BOTS_CATEGORY_NAME}:`,
+        error,
+      );
+    }
+  }
+
+  recordActivity({
+    guildId,
+    action: 'Category created',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `Created category ${category.name} (manual Discord Servers)`,
+  });
+
+  const positionNote = botsCategory
+    ? `Positioned immediately below **${DISCORD_BOTS_CATEGORY_NAME}**.`
+    : `⚠️ **${DISCORD_BOTS_CATEGORY_NAME}** was not found — category was created without relative placement.`;
+
+  return {
+    created: true,
+    id: category.id,
+    name: category.name,
+    message: `✅ Created **${category.name}** (no channels). ${positionNote}`,
+  };
 }
 
 export async function updateChannel(
