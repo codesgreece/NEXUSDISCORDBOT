@@ -10,10 +10,12 @@ import {
 } from '../../services/guildAccessService';
 import { listActivity } from '../../db/activityRepository';
 import { getClient } from '../../bot/client';
+import { guildManageRouter } from './guildManage';
 
 export const guildsRouter = Router();
 
 guildsRouter.use(requireAuth);
+guildsRouter.use('/:guildId', guildManageRouter);
 
 guildsRouter.get('/', async (req, res) => {
   try {

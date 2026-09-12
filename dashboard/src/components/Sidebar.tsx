@@ -41,13 +41,11 @@ function Item({
   to,
   icon: Icon,
   label,
-  soon,
   onNavigate,
 }: {
   to: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  soon?: boolean;
   onNavigate?: () => void;
 }) {
   return (
@@ -55,17 +53,10 @@ function Item({
       to={to}
       end
       onClick={onNavigate}
-      className={({ isActive }) =>
-        `nav-link ${isActive ? 'nav-link-active' : ''} ${soon ? 'opacity-60' : ''}`
-      }
+      className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1">{label}</span>
-      {soon && (
-        <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-nexus-muted">
-          Soon
-        </span>
-      )}
     </NavLink>
   );
 }
@@ -88,33 +79,33 @@ export function Sidebar({ guildId, onLogout, onNavigate }: SidebarProps) {
 
         <Section title="Server">
           <Item to={`${base}/overview`} icon={LayoutDashboard} label="Overview" onNavigate={onNavigate} />
-          <Item to={`${base}/channels`} icon={Hash} label="Channels" soon onNavigate={onNavigate} />
-          <Item to={`${base}/roles`} icon={Shield} label="Roles" soon onNavigate={onNavigate} />
-          <Item to={`${base}/members`} icon={Users} label="Members" soon onNavigate={onNavigate} />
+          <Item to={`${base}/channels`} icon={Hash} label="Channels" onNavigate={onNavigate} />
+          <Item to={`${base}/roles`} icon={Shield} label="Roles" onNavigate={onNavigate} />
+          <Item to={`${base}/members`} icon={Users} label="Members" onNavigate={onNavigate} />
         </Section>
 
         <Section title="Content">
-          <Item to={`${base}/welcome`} icon={Hand} label="Welcome" soon onNavigate={onNavigate} />
-          <Item to={`${base}/rules`} icon={ScrollText} label="Rules" soon onNavigate={onNavigate} />
-          <Item to={`${base}/services`} icon={Briefcase} label="Services" soon onNavigate={onNavigate} />
-          <Item to={`${base}/pricing`} icon={BadgeDollarSign} label="Pricing" soon onNavigate={onNavigate} />
+          <Item to={`${base}/welcome`} icon={Hand} label="Welcome" onNavigate={onNavigate} />
+          <Item to={`${base}/rules`} icon={ScrollText} label="Rules" onNavigate={onNavigate} />
+          <Item to={`${base}/services`} icon={Briefcase} label="Services" onNavigate={onNavigate} />
+          <Item to={`${base}/pricing`} icon={BadgeDollarSign} label="Pricing" onNavigate={onNavigate} />
         </Section>
 
         <Section title="Tickets">
-          <Item to={`${base}/tickets/settings`} icon={Settings2} label="Settings" soon onNavigate={onNavigate} />
-          <Item to={`${base}/tickets/categories`} icon={Tags} label="Categories" soon onNavigate={onNavigate} />
-          <Item to={`${base}/tickets/messages`} icon={MessageSquareText} label="Messages" soon onNavigate={onNavigate} />
+          <Item to={`${base}/tickets/settings`} icon={Settings2} label="Settings" onNavigate={onNavigate} />
+          <Item to={`${base}/tickets/categories`} icon={Tags} label="Categories" onNavigate={onNavigate} />
+          <Item to={`${base}/tickets/messages`} icon={MessageSquareText} label="Messages" onNavigate={onNavigate} />
         </Section>
 
         <Section title="Bot">
-          <Item to={`${base}/bot/general`} icon={Bot} label="General" soon onNavigate={onNavigate} />
-          <Item to={`${base}/bot/status`} icon={Activity} label="Status" soon onNavigate={onNavigate} />
-          <Item to={`${base}/bot/logs`} icon={LogsIcon} label="Logs" soon onNavigate={onNavigate} />
+          <Item to={`${base}/bot/general`} icon={Bot} label="General" onNavigate={onNavigate} />
+          <Item to={`${base}/bot/status`} icon={Activity} label="Status" onNavigate={onNavigate} />
+          <Item to={`${base}/bot/logs`} icon={LogsIcon} label="Logs" onNavigate={onNavigate} />
         </Section>
 
         <Section title="System">
-          <Item to={`${base}/integrations`} icon={Plug} label="Integrations" soon onNavigate={onNavigate} />
-          <Item to={`${base}/security`} icon={Lock} label="Security" soon onNavigate={onNavigate} />
+          <Item to={`${base}/integrations`} icon={Plug} label="Integrations" onNavigate={onNavigate} />
+          <Item to={`${base}/security`} icon={Lock} label="Security" onNavigate={onNavigate} />
         </Section>
       </nav>
 
