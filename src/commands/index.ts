@@ -10,15 +10,35 @@ import { contentCommand } from './content';
 import { shopCommand } from './shop';
 import { shopAdminCommand } from './shopAdmin';
 import { syncShopCommand } from './syncShop';
+import { controlCommand } from './control';
+import { channelsCommand } from './channels';
+import { rolesCommand } from './roles';
+import { memberCommand } from './member';
+import { moderationCommand } from './moderation';
+import { welcomeCommand } from './welcome';
+import { statsCommand } from './stats';
+import { backupCommand } from './backup';
+import { securityCommand } from './security';
+import { syncCommand } from './sync';
 
 export type { Command } from './types';
 
 export const commands: Command[] = [
   setupCommand,
+  controlCommand,
   contentCommand,
   shopCommand,
   shopAdminCommand,
   syncShopCommand,
+  syncCommand,
+  channelsCommand,
+  rolesCommand,
+  memberCommand,
+  moderationCommand,
+  welcomeCommand,
+  statsCommand,
+  backupCommand,
+  securityCommand,
 ];
 
 export function registerCommandCollection(client: Client): void {

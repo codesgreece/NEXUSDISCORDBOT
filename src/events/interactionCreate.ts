@@ -23,6 +23,18 @@ import {
   handleBuyConfirm,
   handleInfoButton,
 } from '../services/purchaseService';
+import {
+  handleControlBindSelect,
+  handleControlButton,
+  handleControlChannelAction,
+  handleControlChannelSelect,
+  handleControlConfirm,
+  handleControlModal,
+  handleControlNav,
+  handleControlRoleSelect,
+  handleControlSelect,
+  handleControlUserSelect,
+} from '../services/controlCenterService';
 
 export async function interactionCreateHandler(interaction: Interaction): Promise<void> {
   try {
@@ -30,7 +42,7 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
       const command = interaction.client.commands.get(interaction.commandName);
       if (!command) {
         await interaction
-          .reply({ content: '❌ Unknown command.', ephemeral: true })
+          .reply({ content: '❌ Άγνωστη εντολή.', ephemeral: true })
           .catch(() => undefined);
         return;
       }
@@ -39,11 +51,42 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
     }
 
     if (interaction.isModalSubmit() && isNexusCustomId(interaction.customId)) {
+      if (interaction.customId.startsWith(`${NEXUS_IDS.CTRL_MODAL}:`)) {
+        await handleControlModal(interaction);
+        return;
+      }
       await handleContentModal(interaction);
       return;
     }
 
+    if (interaction.isUserSelectMenu() && isNexusCustomId(interaction.customId)) {
+      await handleControlUserSelect(interaction);
+      return;
+    }
+
+    if (interaction.isRoleSelectMenu() && isNexusCustomId(interaction.customId)) {
+      await handleControlRoleSelect(interaction);
+      return;
+    }
+
+    if (interaction.isChannelSelectMenu() && isNexusCustomId(interaction.customId)) {
+      await handleControlChannelSelect(interaction);
+      return;
+    }
+
     if (interaction.isStringSelectMenu() && isNexusCustomId(interaction.customId)) {
+      if (interaction.customId === NEXUS_IDS.CTRL_NAV) {
+        await handleControlNav(interaction);
+        return;
+      }
+      if (interaction.customId.startsWith(`${NEXUS_IDS.CTRL_SELECT}:bind:`)) {
+        await handleControlBindSelect(interaction);
+        return;
+      }
+      if (interaction.customId.startsWith(`${NEXUS_IDS.CTRL_SELECT}:`)) {
+        await handleControlSelect(interaction);
+        return;
+      }
       if (interaction.customId.startsWith(`${NEXUS_IDS.PANEL_SELECT}:`)) {
         await handlePanelSelect(interaction);
         return;
@@ -65,6 +108,24 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
       }
 
       if (!isNexusCustomId(id)) return;
+
+      if (id.startsWith(`${NEXUS_IDS.CTRL_CONFIRM}:`)) {
+        await handleControlConfirm(interaction);
+        return;
+      }
+      if (
+        id.startsWith(`${NEXUS_IDS.CTRL_ACTION}:channel_`) ||
+        id.startsWith(`${NEXUS_IDS.CTRL_ACTION}:welcome_channel`) ||
+        id.startsWith(`${NEXUS_IDS.CTRL_ACTION}:tickets_category`) ||
+        id.startsWith(`${NEXUS_IDS.CTRL_ACTION}:tickets_log`)
+      ) {
+        await handleControlChannelAction(interaction);
+        return;
+      }
+      if (id.startsWith(`${NEXUS_IDS.CTRL_ACTION}:`)) {
+        await handleControlButton(interaction);
+        return;
+      }
 
       if (id.startsWith(`${NEXUS_IDS.PANEL_BACK}:`)) {
         await handlePanelBack(interaction);
@@ -105,7 +166,7 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
     await logError(interaction.guild, error, 'interactionCreate');
 
     const payload = {
-      content: '❌ An unexpected error occurred while processing this interaction.',
+      content: '❌ Προέκυψε απρόσμενο σφάλμα. Δοκίμασε ξανά.',
       ephemeral: true,
     };
 
