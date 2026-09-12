@@ -13,6 +13,11 @@ import {
   handleShopRootButton,
 } from '../services/discordShopBrowseService';
 import {
+  handlePanelBack,
+  handlePanelPage,
+  handlePanelSelect,
+} from '../services/shopPanelService';
+import {
   handleBuyButton,
   handleBuyCancel,
   handleBuyConfirm,
@@ -39,6 +44,10 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
     }
 
     if (interaction.isStringSelectMenu() && isNexusCustomId(interaction.customId)) {
+      if (interaction.customId.startsWith(`${NEXUS_IDS.PANEL_SELECT}:`)) {
+        await handlePanelSelect(interaction);
+        return;
+      }
       if (interaction.customId.includes(':pick:')) {
         await handleShopPickSelect(interaction);
         return;
@@ -57,6 +66,14 @@ export async function interactionCreateHandler(interaction: Interaction): Promis
 
       if (!isNexusCustomId(id)) return;
 
+      if (id.startsWith(`${NEXUS_IDS.PANEL_BACK}:`)) {
+        await handlePanelBack(interaction);
+        return;
+      }
+      if (id.startsWith(`${NEXUS_IDS.PANEL_PAGE}:`)) {
+        await handlePanelPage(interaction);
+        return;
+      }
       if (id === NEXUS_IDS.SHOP_ROOT) {
         await handleShopRootButton(interaction);
         return;

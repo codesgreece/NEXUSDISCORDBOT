@@ -44,6 +44,10 @@ export interface CategoryDefinition {
   /** Shown in /shop menu */
   shopVisible: boolean;
   sortOrder: number;
+  /** Compact blurb under the shop panel title */
+  panelBlurb?: string;
+  /** StringSelectMenu placeholder for this category */
+  selectPlaceholder?: string;
 }
 
 export interface ContentChannelDefinition {
@@ -61,6 +65,8 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
     channelName: '🤖・bots',
     shopVisible: true,
     sortOrder: 1,
+    panelBlurb: '> Premium Discord Bots για κάθε server.',
+    selectPlaceholder: '🛒 Επιλέξτε Bot',
   },
   {
     key: 'WEBSITES',
@@ -69,6 +75,8 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
     channelName: '🖥️・websites',
     shopVisible: true,
     sortOrder: 2,
+    panelBlurb: '> Custom websites & web apps.',
+    selectPlaceholder: '🛒 Επιλέξτε Website',
   },
   {
     key: 'DESIGNS',
@@ -77,6 +85,8 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
     channelName: '🎨・designs',
     shopVisible: true,
     sortOrder: 3,
+    panelBlurb: '> Logos, UI/UX και branding.',
+    selectPlaceholder: '🛒 Επιλέξτε Design',
   },
   {
     key: 'SERVICES',
@@ -85,6 +95,8 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
     channelName: '💼・services',
     shopVisible: true,
     sortOrder: 4,
+    panelBlurb: '> Development & consulting services.',
+    selectPlaceholder: '🛒 Επιλέξτε Service',
   },
   {
     key: 'DIGITAL_PRODUCTS',
@@ -93,6 +105,8 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
     channelName: '📁・portfolio',
     shopVisible: true,
     sortOrder: 5,
+    panelBlurb: '> Digital products & assets.',
+    selectPlaceholder: '🛒 Επιλέξτε προϊόν',
   },
   {
     key: 'PROJECTS',
@@ -208,11 +222,20 @@ export const NEXUS_IDS = {
   PRODUCT_MODAL_EDIT: 'nexus:product:modal:edit',
   SHOP_ROOT: 'nexus:shop:root',
   SHOP_CAT: 'nexus:shop:cat',
+  /** Channel shop panel — select product (value = product id) */
+  PANEL_SELECT: 'nexus:panel:select',
+  /** Channel shop panel — back to list */
+  PANEL_BACK: 'nexus:panel:back',
+  /** Channel shop panel — pagination */
+  PANEL_PAGE: 'nexus:panel:page',
   BUY: 'nexus:buy',
   BUY_CONFIRM: 'nexus:buy:confirm',
   BUY_CANCEL: 'nexus:buy:cancel',
   INFO: 'nexus:info',
 } as const;
+
+/** Max options per Discord StringSelectMenu */
+export const SHOP_PANEL_PAGE_SIZE = 25;
 
 export function isNexusCustomId(id: string): boolean {
   return id.startsWith('nexus:');

@@ -502,20 +502,18 @@ export async function handleContentSelect(interaction: StringSelectMenuInteracti
       await interaction.update({ content: 'Not found.', components: [] });
       return;
     }
-    if (product.discordMessageId && product.discordChannelId && interaction.guild) {
+    const categoryKey = product.category;
+    deleteProduct(value);
+    if (interaction.guild) {
       try {
-        const ch = await interaction.guild.channels.fetch(product.discordChannelId);
-        if (ch?.isTextBased()) {
-          const msg = await ch.messages.fetch(product.discordMessageId);
-          await msg.delete();
-        }
+        const { syncCategoryPanel } = await import('./discordShopSyncService');
+        await syncCategoryPanel(interaction.guild, categoryKey);
       } catch {
-        // Message may already be gone
+        // panel refresh best-effort
       }
     }
-    deleteProduct(value);
     await interaction.update({
-      content: `🗑️ Deleted **${product.name}** (DB + Discord message).`,
+      content: `🗑️ Deleted **${product.name}** και ενημερώθηκε το shop panel.`,
       components: [],
     });
     return;

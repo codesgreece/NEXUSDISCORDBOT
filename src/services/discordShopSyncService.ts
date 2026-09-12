@@ -16,13 +16,19 @@ import {
   listCategories,
   upsertGuildSync,
 } from '../db/shopCategoryRepository';
-import { listProducts, updateProduct, type ShopProduct } from '../db/shopProductRepository';
+import {
+  clearDiscordMessage,
+  listProducts,
+  type ShopProduct,
+} from '../db/shopProductRepository';
+import { buildShopPanelListPayload } from './shopPanelService';
 
 function formatPrice(price: number | null): string {
   if (price === null || price === undefined) return 'Τιμή σύντομα';
   return `€${price.toFixed(2)}`;
 }
 
+/** Used by /shop ephemeral browse + purchase confirmation */
 export function buildProductEmbed(product: ShopProduct): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(BRAND.accent)
@@ -50,58 +56,111 @@ export function buildProductButtons(productId: string): ActionRowBuilder<ButtonB
   );
 }
 
-function buildCategoryHeaderEmbed(categoryKey: string, count: number): EmbedBuilder {
-  const def = getCategory(categoryKey) ?? getCategoryDefinition(categoryKey);
-  const emoji = def?.emoji ?? '🛍️';
-  const name = def?.name ?? categoryKey;
-  return new EmbedBuilder()
-    .setColor(BRAND.accent)
-    .setTitle(`${emoji} NEXUS | ${name.toUpperCase()}`)
-    .setDescription(
-      `Επίσημος κατάλογος προϊόντων.\nΕνεργά προϊόντα: **${count}**\n\nΠατήστε **Αγορά** ή **Πληροφορίες**.`,
-    )
-    .setFooter({ text: BRAND.name })
-    .setTimestamp();
-}
-
 function resolveChannel(guild: Guild, categoryKey: string): TextChannel | null {
   const cat = getCategory(categoryKey) ?? getCategoryDefinition(categoryKey);
   if (!cat) return null;
   return findTextChannelByName(guild, cat.channelName) ?? null;
 }
 
-/** EDIT existing product message or CREATE once — never duplicates */
-export async function syncProductToDiscord(
+/** Delete legacy per-product shop messages left by the old sync model */
+async function cleanupLegacyProductMessages(
   guild: Guild,
-  product: ShopProduct,
-): Promise<{ ok: boolean; messageId?: string; error?: string }> {
-  const channel = resolveChannel(guild, product.category);
+  channel: TextChannel,
+  products: ShopProduct[],
+  panelMessageId: string | null,
+): Promise<number> {
+  let removed = 0;
+  for (const product of products) {
+    if (!product.discordMessageId) continue;
+    // Never delete the panel message if an old row somehow pointed at it
+    if (panelMessageId && product.discordMessageId === panelMessageId) {
+      clearDiscordMessage(product.id);
+      continue;
+    }
+    try {
+      const ch =
+        product.discordChannelId && product.discordChannelId !== channel.id
+          ? ((await guild.channels
+              .fetch(product.discordChannelId)
+              .catch(() => null)) as TextChannel | null)
+          : channel;
+      if (ch?.isTextBased()) {
+        const msg = await ch.messages.fetch(product.discordMessageId).catch(() => null);
+        if (msg) {
+          await msg.delete().catch(() => undefined);
+          removed += 1;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    clearDiscordMessage(product.id);
+  }
+  return removed;
+}
+
+/**
+ * Upsert ONE compact shop panel message for a category channel.
+ * Stores message id on shop_guild_sync.header_message_id (panel id).
+ */
+export async function syncCategoryPanel(
+  guild: Guild,
+  categoryKey: string,
+): Promise<{ ok: boolean; messageId?: string; productCount?: number; error?: string }> {
+  const channel = resolveChannel(guild, categoryKey);
   if (!channel) {
-    return { ok: false, error: `Channel missing for ${product.category}` };
+    return { ok: false, error: `Channel missing for ${categoryKey}` };
   }
 
-  const payload = {
-    embeds: [buildProductEmbed(product)],
-    components: product.active ? [buildProductButtons(product.id)] : [],
-  };
+  const allInCategory = listProducts({ category: categoryKey });
+  const sync = getGuildSync(guild.id, categoryKey);
+  const removed = await cleanupLegacyProductMessages(
+    guild,
+    channel,
+    allInCategory,
+    sync?.headerMessageId ?? null,
+  );
+  if (removed > 0) {
+    console.log(
+      `[SHOP] Cleaned ${removed} legacy product message(s) in #${channel.name} (${categoryKey})`,
+    );
+  }
+
+  const payload = buildShopPanelListPayload(categoryKey, 0);
 
   try {
-    if (product.discordMessageId && product.discordChannelId === channel.id) {
+    if (sync?.headerMessageId) {
       try {
-        const existing = await channel.messages.fetch(product.discordMessageId);
-        await existing.edit(payload);
-        return { ok: true, messageId: existing.id };
+        const existing = await channel.messages.fetch(sync.headerMessageId);
+        await existing.edit({
+          content: null,
+          embeds: payload.embeds,
+          components: payload.components,
+        });
+        upsertGuildSync(guild.id, categoryKey, { channelId: channel.id });
+        return {
+          ok: true,
+          messageId: existing.id,
+          productCount: payload.productCount,
+        };
       } catch {
-        // fall through to create
+        // recreate below
       }
     }
 
-    const created = await channel.send(payload);
-    updateProduct(product.id, {
-      discordChannelId: channel.id,
-      discordMessageId: created.id,
+    const created = await channel.send({
+      embeds: payload.embeds,
+      components: payload.components,
     });
-    return { ok: true, messageId: created.id };
+    upsertGuildSync(guild.id, categoryKey, {
+      channelId: channel.id,
+      headerMessageId: created.id,
+    });
+    return {
+      ok: true,
+      messageId: created.id,
+      productCount: payload.productCount,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -110,31 +169,24 @@ export async function syncProductToDiscord(
   }
 }
 
-async function syncCategoryHeader(
+/**
+ * After product create/edit/toggle: refresh the category panel (not a per-product message).
+ * Kept name for compatibility with content manager + dashboard callers.
+ */
+export async function syncProductToDiscord(
   guild: Guild,
-  categoryKey: string,
-  channel: TextChannel,
-  count: number,
-): Promise<void> {
-  const sync = getGuildSync(guild.id, categoryKey);
-  const embed = buildCategoryHeaderEmbed(categoryKey, count);
-
-  if (sync?.headerMessageId) {
-    try {
-      const msg = await channel.messages.fetch(sync.headerMessageId);
-      await msg.edit({ embeds: [embed] });
-      upsertGuildSync(guild.id, categoryKey, { channelId: channel.id });
-      return;
-    } catch {
-      // recreate
-    }
+  product: ShopProduct,
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  // Clear any leftover per-product message id — panel is the source of truth now
+  if (product.discordMessageId) {
+    clearDiscordMessage(product.id);
   }
-
-  const created = await channel.send({ embeds: [embed] });
-  upsertGuildSync(guild.id, categoryKey, {
-    channelId: channel.id,
-    headerMessageId: created.id,
-  });
+  const result = await syncCategoryPanel(guild, product.category);
+  return {
+    ok: result.ok,
+    messageId: result.messageId,
+    error: result.error,
+  };
 }
 
 export interface SyncShopResult {
@@ -156,8 +208,7 @@ export async function syncShopToDiscord(guild: Guild): Promise<SyncShopResult> {
 
   for (const category of categories) {
     const allInCategory = listProducts({ category: category.key });
-    const products = allInCategory.filter((p) => p.active);
-    // Skip empty categories so we do not spam unused channels with headers.
+    // Skip empty categories so we do not spam unused channels.
     if (allInCategory.length === 0) continue;
 
     const channel = findTextChannelByName(guild, category.channelName);
@@ -165,48 +216,25 @@ export async function syncShopToDiscord(guild: Guild): Promise<SyncShopResult> {
       result.errors.push(`Missing channel: ${category.channelName} (${category.key})`);
       continue;
     }
+
+    const panel = await syncCategoryPanel(guild, category.key);
+    if (!panel.ok) {
+      result.productsFailed += 1;
+      if (panel.error) result.errors.push(`${category.key}: ${panel.error}`);
+      continue;
+    }
+
     result.categories += 1;
-
-    try {
-      await syncCategoryHeader(guild, category.key, channel, products.length);
-    } catch (error) {
-      result.errors.push(
-        `Header ${category.key}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    for (const product of products) {
-      const sync = await syncProductToDiscord(guild, product);
-      if (sync.ok) result.productsSynced += 1;
-      else {
-        result.productsFailed += 1;
-        if (sync.error) result.errors.push(`${product.name}: ${sync.error}`);
-      }
-    }
-
-    const inactive = allInCategory.filter((p) => !p.active);
-    for (const product of inactive) {
-      if (!product.discordMessageId || !product.discordChannelId) continue;
-      try {
-        const ch =
-          product.discordChannelId === channel.id
-            ? channel
-            : ((await guild.channels.fetch(product.discordChannelId).catch(() => null)) as TextChannel | null);
-        if (!ch?.isTextBased()) continue;
-        const msg = await ch.messages.fetch(product.discordMessageId);
-        await msg.edit({
-          embeds: [
-            buildProductEmbed(product).setTitle(
-              `${product.emoji} ${product.name} (unavailable)`,
-            ),
-          ],
-          components: [],
-        });
-      } catch {
-        // ignore
-      }
-    }
+    result.productsSynced += panel.productCount ?? 0;
   }
 
   return result;
+}
+
+/** @deprecated alias — prefer syncCategoryPanel */
+export async function refreshProductDiscord(
+  guild: Guild,
+  product: ShopProduct,
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  return syncProductToDiscord(guild, product);
 }
