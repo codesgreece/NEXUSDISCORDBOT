@@ -1,4 +1,5 @@
 import {
+  CategoryChannel,
   ChannelType,
   Guild,
   GuildChannel,
@@ -9,13 +10,77 @@ import {
 import { getClient } from '../bot/client';
 import { recordActivity } from '../db/activityRepository';
 import { getRoleBindings } from '../db/controlRepository';
-import { findCategoryByName, getStaffRoles } from '../utils/discord';
+import { getStaffRoles } from '../utils/discord';
 import {
   DISCORD_BOTS_CATEGORY_NAME,
   DISCORD_SERVERS_CATEGORY_NAME,
 } from '../config/serverStructure';
 
 export { DISCORD_BOTS_CATEGORY_NAME, DISCORD_SERVERS_CATEGORY_NAME };
+
+function getSortedCategories(guild: Guild): CategoryChannel[] {
+  return [...guild.channels.cache.values()]
+    .filter((c): c is CategoryChannel => c.type === ChannelType.GuildCategory)
+    .sort((a, b) => a.position - b.position);
+}
+
+function findGuildCategoryByName(guild: Guild, name: string): CategoryChannel | undefined {
+  return getSortedCategories(guild).find((c) => c.name === name);
+}
+
+function isCategoryDirectlyBelow(
+  guild: Guild,
+  aboveCategoryId: string,
+  belowCategoryId: string,
+): boolean {
+  const categories = getSortedCategories(guild);
+  const aboveIndex = categories.findIndex((c) => c.id === aboveCategoryId);
+  const belowIndex = categories.findIndex((c) => c.id === belowCategoryId);
+  return aboveIndex >= 0 && belowIndex === aboveIndex + 1;
+}
+
+/** Place `category` immediately below `botsCategory` in the category list. */
+async function placeCategoryBelowBots(
+  guild: Guild,
+  category: CategoryChannel,
+  botsCategory: CategoryChannel,
+  reason: string,
+): Promise<void> {
+  const others = getSortedCategories(guild).filter((c) => c.id !== category.id);
+  const botsIndex = others.findIndex((c) => c.id === botsCategory.id);
+  if (botsIndex < 0) return;
+
+  const nextCategory = others[botsIndex + 1];
+  if (nextCategory) {
+    // Insert before the next category → becomes immediately below bots
+    await category.setPosition(nextCategory.position, { reason });
+  } else {
+    // Bots is the last category — move just after it
+    await category.setPosition(botsCategory.position + 1, { reason });
+  }
+}
+
+function assertValidDiscordServersCategory(
+  channel: { id?: string | null; type: ChannelType; guildId: string | null; name: string },
+  guildId: string,
+): void {
+  if (!channel.id) {
+    throw new Error('Discord returned a category without an id');
+  }
+  if (channel.type !== ChannelType.GuildCategory) {
+    throw new Error(
+      `Discord returned type ${channel.type}, expected GuildCategory (${ChannelType.GuildCategory})`,
+    );
+  }
+  if (channel.guildId !== guildId) {
+    throw new Error(`Category guild mismatch: ${channel.guildId} !== ${guildId}`);
+  }
+  if (channel.name !== DISCORD_SERVERS_CATEGORY_NAME) {
+    throw new Error(
+      `Category name mismatch: got "${channel.name}", expected "${DISCORD_SERVERS_CATEGORY_NAME}"`,
+    );
+  }
+}
 
 export function listChannels(guildId: string) {
   const guild = getClient().guilds.cache.get(guildId);
@@ -163,78 +228,153 @@ function buildDiscordServersCategoryOverwrites(guild: Guild): OverwriteResolvabl
 
 /**
  * Explicit Control Center action: create **only** `🌐 DISCORD SERVERS`.
- * - No channels inside
- * - No other categories touched
- * - No duplicate if it already exists (permissions left unchanged)
- * - Positioned immediately below `🤖 DISCORD BOTS`
+ * Success is returned only after Discord confirms the category exists.
  */
 export async function createDiscordServersCategory(
   guildId: string,
   actor?: { id: string; tag: string },
-): Promise<{ created: boolean; id: string; name: string; message: string }> {
+): Promise<{
+  created: boolean;
+  id: string;
+  name: string;
+  position: number;
+  message: string;
+}> {
   const guild = getClient().guilds.cache.get(guildId);
   if (!guild) throw new Error('Guild not found');
 
-  const existing = findCategoryByName(guild, DISCORD_SERVERS_CATEGORY_NAME);
+  // 1) Fetch existing guild channels once
+  console.log('[DISCORD SERVERS] Creating category...');
+  console.log(`[DISCORD SERVERS] Guild ID: ${guild.id}`);
+  await guild.channels.fetch();
+
+  const botsCategory = findGuildCategoryByName(guild, DISCORD_BOTS_CATEGORY_NAME);
+  const existing = findGuildCategoryByName(guild, DISCORD_SERVERS_CATEGORY_NAME);
+
+  // 2) Already exists → do not duplicate / do not reset permissions
   if (existing) {
+    assertValidDiscordServersCategory(existing, guild.id);
+    const positionBefore = existing.position;
+    console.log(`[DISCORD SERVERS] Already exists ID: ${existing.id}`);
+    console.log(`[DISCORD SERVERS] Position before: ${positionBefore}`);
+
+    if (
+      botsCategory &&
+      !isCategoryDirectlyBelow(guild, botsCategory.id, existing.id)
+    ) {
+      await placeCategoryBelowBots(
+        guild,
+        existing,
+        botsCategory,
+        `Enforce ${DISCORD_SERVERS_CATEGORY_NAME} below ${DISCORD_BOTS_CATEGORY_NAME}`,
+      );
+    }
+
+    await guild.channels.fetch();
+    const verifiedExisting = await guild.channels.fetch(existing.id);
+    if (!verifiedExisting) {
+      console.log('[DISCORD SERVERS] Verification: FAILED');
+      throw new Error(
+        `Category ${existing.id} could not be re-fetched from Discord after existence check`,
+      );
+    }
+    assertValidDiscordServersCategory(verifiedExisting, guild.id);
+
+    const positionAfter =
+      'position' in verifiedExisting ? verifiedExisting.position : positionBefore;
+    console.log(`[DISCORD SERVERS] Position after: ${positionAfter}`);
+    console.log('[DISCORD SERVERS] Verification: SUCCESS');
+
+    const placementOk =
+      !botsCategory || isCategoryDirectlyBelow(guild, botsCategory.id, verifiedExisting.id);
     return {
       created: false,
-      id: existing.id,
-      name: existing.name,
-      message: `ℹ️ Category **${DISCORD_SERVERS_CATEGORY_NAME}** already exists — no duplicate created and permissions were not reset.`,
+      id: verifiedExisting.id,
+      name: verifiedExisting.name,
+      position: positionAfter,
+      message: [
+        `ℹ️ Category **${verifiedExisting.name}** already exists`,
+        `(id \`${verifiedExisting.id}\`, <#${verifiedExisting.id}>).`,
+        `Position: **${positionAfter}**.`,
+        botsCategory
+          ? placementOk
+            ? `Confirmed directly below **${DISCORD_BOTS_CATEGORY_NAME}**.`
+            : `⚠️ Could not confirm placement directly below **${DISCORD_BOTS_CATEGORY_NAME}**.`
+          : `⚠️ **${DISCORD_BOTS_CATEGORY_NAME}** not found — placement not enforced.`,
+        'Permissions were not modified.',
+      ].join(' '),
     };
   }
 
-  const botsCategory = findCategoryByName(guild, DISCORD_BOTS_CATEGORY_NAME);
-  const overwrites = buildDiscordServersCategoryOverwrites(guild);
-
+  // 3) Create immediately via Discord API
   const category = await guild.channels.create({
     name: DISCORD_SERVERS_CATEGORY_NAME,
     type: ChannelType.GuildCategory,
-    permissionOverwrites: overwrites,
+    permissionOverwrites: buildDiscordServersCategoryOverwrites(guild),
     reason: `Manual Control Center create by ${actor?.tag ?? 'unknown'}`,
   });
 
+  assertValidDiscordServersCategory(category, guild.id);
+  console.log(`[DISCORD SERVERS] Created category ID: ${category.id}`);
+  const positionBefore = category.position;
+  console.log(`[DISCORD SERVERS] Position before: ${positionBefore}`);
+
+  // 4) Set position immediately below 🤖 DISCORD BOTS via Discord position API
   if (botsCategory) {
-    const childPositions: number[] = [];
-    for (const c of guild.channels.cache.values()) {
-      if (!('parentId' in c) || !('rawPosition' in c)) continue;
-      if (c.parentId !== botsCategory.id) continue;
-      childPositions.push((c as { rawPosition: number }).rawPosition);
-    }
-    const blockEnd = Math.max(
-      botsCategory.rawPosition,
-      ...(childPositions.length ? childPositions : [botsCategory.rawPosition]),
+    const botsFresh =
+      (guild.channels.cache.get(botsCategory.id) as CategoryChannel | undefined) ?? botsCategory;
+    await placeCategoryBelowBots(
+      guild,
+      category,
+      botsFresh,
+      `Place ${DISCORD_SERVERS_CATEGORY_NAME} below ${DISCORD_BOTS_CATEGORY_NAME}`,
     );
-    try {
-      await category.setPosition(blockEnd + 1, {
-        reason: `Place ${DISCORD_SERVERS_CATEGORY_NAME} below ${DISCORD_BOTS_CATEGORY_NAME}`,
-      });
-    } catch (error) {
-      console.warn(
-        `[CHANNELS] Created ${DISCORD_SERVERS_CATEGORY_NAME} but could not set position below ${DISCORD_BOTS_CATEGORY_NAME}:`,
-        error,
-      );
-    }
   }
 
-  recordActivity({
-    guildId,
-    action: 'Category created',
-    userId: actor?.id,
-    userTag: actor?.tag,
-    details: `Created category ${category.name} (manual Discord Servers)`,
-  });
+  // 5) Verify with one refresh/fetch
+  await guild.channels.fetch();
+  const verified = await guild.channels.fetch(category.id);
+  if (!verified) {
+    console.log('[DISCORD SERVERS] Verification: FAILED');
+    throw new Error(
+      `Discord create returned id ${category.id}, but the category was not found on refresh`,
+    );
+  }
 
-  const positionNote = botsCategory
-    ? `Positioned immediately below **${DISCORD_BOTS_CATEGORY_NAME}**.`
-    : `⚠️ **${DISCORD_BOTS_CATEGORY_NAME}** was not found — category was created without relative placement.`;
+  try {
+    assertValidDiscordServersCategory(verified, guild.id);
+  } catch (error) {
+    console.log('[DISCORD SERVERS] Verification: FAILED');
+    throw error;
+  }
+
+  const positionAfter = 'position' in verified ? verified.position : category.position;
+  console.log(`[DISCORD SERVERS] Position after: ${positionAfter}`);
+
+  const placementOk =
+    !botsCategory || isCategoryDirectlyBelow(guild, botsCategory.id, verified.id);
+  if (botsCategory && !placementOk) {
+    console.log('[DISCORD SERVERS] Verification: FAILED');
+    throw new Error(
+      `Category was created (id ${verified.id}) but is not positioned directly below ${DISCORD_BOTS_CATEGORY_NAME}`,
+    );
+  }
+
+  console.log('[DISCORD SERVERS] Verification: SUCCESS');
 
   return {
     created: true,
-    id: category.id,
-    name: category.name,
-    message: `✅ Created **${category.name}** (no channels). ${positionNote}`,
+    id: verified.id,
+    name: verified.name,
+    position: positionAfter,
+    message: [
+      `✅ Verified category **${verified.name}**`,
+      `(id \`${verified.id}\`, <#${verified.id}>, position **${positionAfter}**).`,
+      botsCategory
+        ? `Placed directly below **${DISCORD_BOTS_CATEGORY_NAME}**.`
+        : `⚠️ **${DISCORD_BOTS_CATEGORY_NAME}** was not found — created without relative placement.`,
+      'No channels were created inside it.',
+    ].join(' '),
   };
 }
 

@@ -1009,9 +1009,16 @@ export async function handleControlButton(interaction: ButtonInteraction): Promi
           });
           await interaction.editReply({ content: result.message });
         } catch (error) {
+          const discordCode =
+            error && typeof error === 'object' && 'code' in error
+              ? String((error as { code: unknown }).code)
+              : null;
           const msg = error instanceof Error ? error.message : String(error);
+          console.error('[DISCORD SERVERS] Control Center action failed:', error);
           await interaction.editReply({
-            content: `❌ Failed to create **🌐 DISCORD SERVERS**: ${msg}`,
+            content: discordCode
+              ? `❌ Discord API error \`${discordCode}\`: ${msg}`
+              : `❌ Failed to create **🌐 DISCORD SERVERS**: ${msg}`,
           });
         }
         return;
