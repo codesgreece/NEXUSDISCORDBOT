@@ -12,6 +12,12 @@ import { getGuildConfig, updateGuildConfig } from '../db/guildConfigRepository';
 import { findTextChannelByName } from '../utils/discord';
 import { recordActivity } from '../db/activityRepository';
 import { BRAND, CUSTOM_IDS } from '../config/serverStructure';
+import {
+  MANAGED_EMBED_MARKERS,
+  publishManagedEmbed,
+  scrubManagedEmbedContent,
+  type ManagedEmbedKey,
+} from './managedEmbedService';
 
 export type EmbedKind = 'welcome' | 'rules' | 'services' | 'pricing' | 'ticket';
 
@@ -51,12 +57,13 @@ const CHANNEL_BY_KIND: Record<EmbedKind, string> = {
   ticket: '🎫・create-ticket',
 };
 
-const MARKER_BY_KIND: Record<EmbedKind, string> = {
-  welcome: 'NEXUS_WELCOME_EMBED',
-  rules: 'NEXUS_RULES_EMBED',
-  services: 'NEXUS_SERVICES_EMBED',
-  pricing: 'NEXUS_PRICING_EMBED',
-  ticket: 'NEXUS_TICKET_PANEL',
+/** Internal identity keys — never sent as Discord message content */
+const ENTITY_BY_KIND: Record<EmbedKind, ManagedEmbedKey> = {
+  welcome: 'welcome',
+  rules: 'rules',
+  services: 'services',
+  pricing: 'pricing',
+  ticket: 'ticket',
 };
 
 const DEFAULTS: Record<Exclude<EmbedKind, 'ticket'>, EmbedPayload> = {
@@ -222,11 +229,6 @@ function messageIdKey(kind: EmbedKind): keyof ReturnType<typeof getGuildConfig> 
   }
 }
 
-async function findMarkedMessage(channel: TextChannel, marker: string) {
-  const messages = await channel.messages.fetch({ limit: 50 });
-  return messages.find((m) => m.author.bot && m.content.includes(marker)) ?? null;
-}
-
 export function getStoredEmbed(guildId: string, kind: EmbedKind): EmbedPayload {
   const config = getGuildConfig(guildId) as ReturnType<typeof getGuildConfig> & Record<string, unknown>;
   const raw = config[`${kind}Embed` as string];
@@ -297,36 +299,34 @@ export async function saveEmbedToDiscord(
     throw new Error(`Channel ${CHANNEL_BY_KIND[kind]} not found. Run /setup first.`);
   }
 
-  const marker = MARKER_BY_KIND[kind];
+  const entityId = ENTITY_BY_KIND[kind];
   const embed = buildEmbedFromPayload(payload);
   const components = kind === 'ticket' ? buildActionRows(payload.buttons) : [];
-  const content = `<!-- ${marker} -->`;
 
   const config = getGuildConfig(guildId);
   const storedId = config[messageIdKey(kind)] as string | null;
-  let message = storedId ? await channel.messages.fetch(storedId).catch(() => null) : null;
-  if (!message) {
-    message = await findMarkedMessage(channel, marker);
-  }
 
-  if (message) {
-    await message.edit({ content, embeds: [embed], components });
-  } else {
-    message = await channel.send({ content, embeds: [embed], components });
-  }
+  const { message } = await publishManagedEmbed({
+    guildId,
+    channel,
+    entityId,
+    embeds: [embed],
+    components,
+    storedMessageId: storedId,
+    legacyMarker: MANAGED_EMBED_MARKERS[entityId],
+  });
 
   const patch: Record<string, unknown> = {
     [`${kind}Embed`]: JSON.stringify(payload),
   };
-  // message id fields
   if (kind === 'welcome') patch.welcomeMessageId = message.id;
   if (kind === 'rules') patch.rulesMessageId = message.id;
   if (kind === 'services') patch.servicesMessageId = message.id;
   if (kind === 'pricing') patch.pricingMessageId = message.id;
   if (kind === 'ticket') patch.ticketPanelMessageId = message.id;
 
-  // Persist embed JSON via extended repo helper
   persistEmbedJson(guildId, kind, payload, message.id);
+  updateGuildConfig(guildId, patch as Parameters<typeof updateGuildConfig>[1]);
 
   recordActivity({
     guildId,
@@ -337,6 +337,47 @@ export async function saveEmbedToDiscord(
   });
 
   return { messageId: message.id, channelId: channel.id, payload };
+}
+
+/** Strip visible HTML markers from all known managed embeds without changing wording. */
+export async function scrubAllManagedEmbedMarkers(guildId: string): Promise<
+  Array<{ kind: EmbedKind; scrubbed: boolean; messageId: string | null }>
+> {
+  const client = getClient();
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+
+  const config = getGuildConfig(guildId);
+  const results: Array<{ kind: EmbedKind; scrubbed: boolean; messageId: string | null }> = [];
+
+  for (const kind of Object.keys(CHANNEL_BY_KIND) as EmbedKind[]) {
+    const channel = findTextChannelByName(guild, CHANNEL_BY_KIND[kind]);
+    if (!channel) {
+      results.push({ kind, scrubbed: false, messageId: null });
+      continue;
+    }
+    const entityId = ENTITY_BY_KIND[kind];
+    const storedId = config[messageIdKey(kind)] as string | null;
+    const result = await scrubManagedEmbedContent({
+      guildId,
+      channel,
+      entityId,
+      storedMessageId: storedId,
+      legacyMarker: MANAGED_EMBED_MARKERS[entityId],
+    });
+    if (result.messageId) {
+      const patch: Record<string, unknown> = {};
+      if (kind === 'welcome') patch.welcomeMessageId = result.messageId;
+      if (kind === 'rules') patch.rulesMessageId = result.messageId;
+      if (kind === 'services') patch.servicesMessageId = result.messageId;
+      if (kind === 'pricing') patch.pricingMessageId = result.messageId;
+      if (kind === 'ticket') patch.ticketPanelMessageId = result.messageId;
+      updateGuildConfig(guildId, patch as Parameters<typeof updateGuildConfig>[1]);
+    }
+    results.push({ kind, scrubbed: result.scrubbed, messageId: result.messageId });
+  }
+
+  return results;
 }
 
 function persistEmbedJson(

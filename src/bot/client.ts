@@ -30,6 +30,11 @@ export function getClient(): Client {
   return clientInstance;
 }
 
+/** Used by one-shot maintenance scripts */
+export function setClient(client: Client): void {
+  clientInstance = client;
+}
+
 export function getClientOrNull(): Client | null {
   return clientInstance;
 }
