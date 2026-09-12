@@ -189,6 +189,9 @@ export async function openProductManager(
   });
 }
 
+/** Alias used by Control Center shop-admin button */
+export const openShopAdmin = openProductManager;
+
 async function runSync(interaction: ButtonInteraction): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
   const result = await syncShopToDiscord(interaction.guild!);

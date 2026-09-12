@@ -89,3 +89,51 @@ export async function kickMember(
 
   return { ok: true };
 }
+
+export async function banMember(
+  guildId: string,
+  userId: string,
+  actor?: { id: string; tag: string },
+  reason?: string,
+  deleteMessageSeconds = 0,
+) {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+
+  await guild.members.ban(userId, {
+    reason: (reason || `Dashboard ban by ${actor?.tag ?? 'unknown'}`).slice(0, 512),
+    deleteMessageSeconds: Math.min(Math.max(deleteMessageSeconds, 0), 604800),
+  });
+
+  recordActivity({
+    guildId,
+    action: 'Member banned',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `${userId}${reason ? ` · ${reason}` : ''}`,
+  });
+
+  return { ok: true };
+}
+
+export async function setNickname(
+  guildId: string,
+  userId: string,
+  nickname: string | null,
+  actor?: { id: string; tag: string },
+) {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+  const member = await guild.members.fetch(userId);
+  await member.setNickname(nickname, `Dashboard nickname by ${actor?.tag ?? 'unknown'}`);
+
+  recordActivity({
+    guildId,
+    action: 'Member nickname updated',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `${member.user.tag} → ${nickname ?? '(cleared)'}`,
+  });
+
+  return { ok: true };
+}

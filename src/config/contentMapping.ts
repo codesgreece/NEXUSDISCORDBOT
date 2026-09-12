@@ -232,6 +232,18 @@ export const NEXUS_IDS = {
   BUY_CONFIRM: 'nexus:buy:confirm',
   BUY_CANCEL: 'nexus:buy:cancel',
   INFO: 'nexus:info',
+
+  /** Control Center hub */
+  CTRL_ROOT: 'nexus:ctrl:root',
+  CTRL_NAV: 'nexus:ctrl:nav',
+  CTRL_ACTION: 'nexus:ctrl:action',
+  CTRL_SELECT: 'nexus:ctrl:select',
+  CTRL_MODAL: 'nexus:ctrl:modal',
+  CTRL_CONFIRM: 'nexus:ctrl:confirm',
+  CTRL_CANCEL: 'nexus:ctrl:cancel',
+  CTRL_USER: 'nexus:ctrl:user',
+  CTRL_ROLE: 'nexus:ctrl:role',
+  CTRL_CHANNEL: 'nexus:ctrl:channel',
 } as const;
 
 /** Max options per Discord StringSelectMenu */

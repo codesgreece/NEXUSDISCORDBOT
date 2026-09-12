@@ -173,3 +173,79 @@ export async function setChannelPrivateStaff(
   ];
   await channel.permissionOverwrites.set(overwrites);
 }
+
+export async function lockChannel(
+  guildId: string,
+  channelId: string,
+  actor?: { id: string; tag: string },
+) {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel || !('permissionOverwrites' in channel)) throw new Error('Invalid channel');
+
+  await channel.permissionOverwrites.edit(guild.id, { SendMessages: false });
+
+  recordActivity({
+    guildId,
+    action: 'Channel locked',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `#${channel.name}`,
+  });
+
+  return { ok: true };
+}
+
+export async function unlockChannel(
+  guildId: string,
+  channelId: string,
+  actor?: { id: string; tag: string },
+) {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel || !('permissionOverwrites' in channel)) throw new Error('Invalid channel');
+
+  await channel.permissionOverwrites.edit(guild.id, { SendMessages: null });
+
+  recordActivity({
+    guildId,
+    action: 'Channel unlocked',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `#${channel.name}`,
+  });
+
+  return { ok: true };
+}
+
+export async function setSlowmode(
+  guildId: string,
+  channelId: string,
+  seconds: number,
+  actor?: { id: string; tag: string },
+) {
+  const guild = getClient().guilds.cache.get(guildId);
+  if (!guild) throw new Error('Guild not found');
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel || channel.type !== ChannelType.GuildText) {
+    throw new Error('Slowmode only supported on text channels');
+  }
+
+  const rate = Math.min(21600, Math.max(0, Math.floor(seconds)));
+  await (channel as TextChannel).setRateLimitPerUser(
+    rate,
+    `Dashboard slowmode by ${actor?.tag ?? 'unknown'}`,
+  );
+
+  recordActivity({
+    guildId,
+    action: 'Channel slowmode updated',
+    userId: actor?.id,
+    userTag: actor?.tag,
+    details: `#${channel.name} · ${rate}s`,
+  });
+
+  return { ok: true, seconds: rate };
+}
