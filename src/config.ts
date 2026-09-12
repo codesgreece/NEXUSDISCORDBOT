@@ -33,6 +33,11 @@ const sessionSecret = optionalEnv('SESSION_SECRET', 'dev-change-me-nexus-session
 const databaseUrl = optionalEnv('DATABASE_URL', path.join(process.cwd(), 'data', 'nexus.sqlite'));
 const port = Number(optionalEnv('PORT', '3001'));
 const dashboardOrigin = optionalEnv('DASHBOARD_ORIGIN', 'http://localhost:5173');
+/** Comma-separated Discord user IDs always treated as dashboard admins */
+const dashboardAdminIds = optionalEnv('DASHBOARD_ADMIN_IDS')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 export const config = {
   token,
@@ -45,6 +50,7 @@ export const config = {
   databaseUrl,
   port,
   dashboardOrigin,
+  dashboardAdminIds,
   isProd: process.env.NODE_ENV === 'production',
 } as const;
 

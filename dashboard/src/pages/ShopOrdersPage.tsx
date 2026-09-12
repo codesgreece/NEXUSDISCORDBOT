@@ -16,7 +16,9 @@ export function ShopOrdersPage() {
       setOrders(res.orders);
       setScope(nextScope);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load orders');
+      const message = e instanceof Error ? e.message : 'Failed to load orders';
+      // Keep current scope + orders if staff view fails (e.g. missing Manage Server)
+      setError(message);
     }
   };
 
@@ -49,6 +51,12 @@ export function ShopOrdersPage() {
         }
       />
       <ErrorBanner message={error} />
+      {error && scope === 'mine' && (
+        <p className="mb-4 text-xs text-nexus-muted">
+          Οι δικές σου παραγγελίες φαίνονται κανονικά. Το «Όλες (staff)» χρειάζεται Discord Admin /
+          Manage Server ή staff role στον server.
+        </p>
+      )}
 
       <div className="space-y-3">
         {(orders ?? []).map((order) => (

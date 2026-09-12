@@ -1,7 +1,9 @@
 import { ChannelType, Guild, PermissionFlagsBits } from 'discord.js';
+import { config } from '../config';
 import { getClient } from '../bot/client';
 import { listActivity } from '../db/activityRepository';
 import { getGuildConfig } from '../db/guildConfigRepository';
+import { getStaffRoles } from '../utils/discord';
 
 export interface DiscordUserGuild {
   id: string;
@@ -96,6 +98,8 @@ export async function fetchUserGuilds(
 }
 
 async function memberCanManage(guildId: string, userId: string): Promise<boolean> {
+  if (config.dashboardAdminIds.includes(userId)) return true;
+
   const client = getClient();
   const guild = client.guilds.cache.get(guildId);
   if (!guild) return false;
@@ -106,10 +110,29 @@ async function memberCanManage(guildId: string, userId: string): Promise<boolean
       guild.members.cache.get(userId) ??
       (await guild.members.fetch(userId).catch(() => null));
     if (!member) return false;
-    return (
+
+    // Discord permission bits
+    if (
       member.permissions.has(PermissionFlagsBits.Administrator) ||
       member.permissions.has(PermissionFlagsBits.ManageGuild)
-    );
+    ) {
+      return true;
+    }
+
+    // NEXUS staff roles (e.g. 👑 Owner) — cosmetic role ≠ Discord ownerId,
+    // but should still manage the dashboard for this server.
+    const staffRoles = getStaffRoles(guild);
+    if (staffRoles.some((role) => member.roles.cache.has(role.id))) {
+      return true;
+    }
+
+    // Configured staff role IDs from guild settings
+    const cfg = getGuildConfig(guildId);
+    if (cfg.staffRoleIds.some((roleId) => member.roles.cache.has(roleId))) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -171,7 +194,7 @@ export async function assertGuildManage(
 
   if (!allowed) {
     throw new GuildAccessError(
-      'You need Administrator or Manage Server to change this server.',
+      'Χρειάζεσαι Discord Owner / Administrator / Manage Server, ή staff role (π.χ. 👑 Owner) για αλλαγές σε αυτόν τον server.',
     );
   }
 
