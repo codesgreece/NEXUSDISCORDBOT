@@ -83,6 +83,8 @@ shopRouter.post('/products', async (req, res) => {
       active: req.body?.active !== false,
       sortOrder: req.body?.sortOrder !== undefined ? Number(req.body.sortOrder) : undefined,
       id: req.body?.id,
+      category: req.body?.category ? String(req.body.category) : 'DISCORD_BOTS',
+      imageUrl: req.body?.imageUrl ? String(req.body.imageUrl) : null,
     });
     res.status(201).json({ product });
   } catch (error) {
@@ -100,6 +102,10 @@ shopRouter.patch('/products/:productId', async (req, res) => {
     if (req.body?.description !== undefined) patch.description = String(req.body.description);
     if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
     if (req.body?.sortOrder !== undefined) patch.sortOrder = Number(req.body.sortOrder);
+    if (req.body?.category !== undefined) patch.category = String(req.body.category);
+    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'imageUrl')) {
+      patch.imageUrl = req.body.imageUrl ? String(req.body.imageUrl) : null;
+    }
     if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'price')) {
       if (req.body.price === null || req.body.price === '') {
         patch.price = null;
@@ -202,5 +208,24 @@ shopRouter.get('/orders/:orderId', async (req, res) => {
     res.json({ order });
   } catch (error) {
     handleError(res, error, 'Failed to load order');
+  }
+});
+
+/** Sync catalog embeds into existing Discord channels (edit/create, no duplicates) */
+shopRouter.post('/sync', async (req, res) => {
+  try {
+    const user = getSessionUser(req)!;
+    await assertGuildManage(user.accessToken, gid(req), user.id);
+    const { getClient } = await import('../../bot/client');
+    const { syncShopToDiscord } = await import('../../services/discordShopSyncService');
+    const guild = getClient().guilds.cache.get(gid(req));
+    if (!guild) {
+      res.status(400).json({ error: 'Bot is not in this guild' });
+      return;
+    }
+    const result = await syncShopToDiscord(guild);
+    res.json(result);
+  } catch (error) {
+    handleError(res, error, 'Shop sync failed');
   }
 });

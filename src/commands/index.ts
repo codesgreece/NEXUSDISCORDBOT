@@ -6,10 +6,20 @@ import {
 } from 'discord.js';
 import type { Command } from './types';
 import { setupCommand } from './setup';
+import { contentCommand } from './content';
+import { shopCommand } from './shop';
+import { shopAdminCommand } from './shopAdmin';
+import { syncShopCommand } from './syncShop';
 
 export type { Command } from './types';
 
-export const commands: Command[] = [setupCommand];
+export const commands: Command[] = [
+  setupCommand,
+  contentCommand,
+  shopCommand,
+  shopAdminCommand,
+  syncShopCommand,
+];
 
 export function registerCommandCollection(client: Client): void {
   client.commands = new Collection();

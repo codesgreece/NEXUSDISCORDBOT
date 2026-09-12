@@ -242,6 +242,8 @@ export const api = {
       active?: boolean;
       sortOrder?: number;
       id?: string;
+      category?: string;
+      imageUrl?: string | null;
     },
   ) =>
     request<{ product: ShopProduct }>(`/api/guilds/${guildId}/shop/products`, {
@@ -258,6 +260,8 @@ export const api = {
       price: number | null;
       active: boolean;
       sortOrder: number;
+      category: string;
+      imageUrl: string | null;
     }>,
   ) =>
     request<{ product: ShopProduct }>(`/api/guilds/${guildId}/shop/products/${productId}`, {
@@ -268,6 +272,13 @@ export const api = {
     request<{ ok: boolean }>(`/api/guilds/${guildId}/shop/products/${productId}`, {
       method: 'DELETE',
     }),
+  shopSync: (guildId: string) =>
+    request<{
+      categories: number;
+      productsSynced: number;
+      productsFailed: number;
+      errors: string[];
+    }>(`/api/guilds/${guildId}/shop/sync`, { method: 'POST', body: '{}' }),
   shopCheckout: (
     guildId: string,
     body: { items: Array<{ productId: string; quantity: number }>; notes?: string },
@@ -287,11 +298,16 @@ export const api = {
 export interface ShopProduct {
   id: string;
   name: string;
+  slug?: string;
   emoji: string;
   description: string;
   price: number | null;
+  category?: string;
+  imageUrl?: string | null;
   active: boolean;
   sortOrder: number;
+  discordChannelId?: string | null;
+  discordMessageId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

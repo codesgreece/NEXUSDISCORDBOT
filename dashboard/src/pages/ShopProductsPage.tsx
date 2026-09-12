@@ -8,6 +8,8 @@ const emptyForm = {
   emoji: '🤖',
   description: '',
   price: '',
+  category: 'DISCORD_BOTS',
+  imageUrl: '',
   active: true,
 };
 
@@ -40,6 +42,8 @@ export function ShopProductsPage() {
       emoji: p.emoji,
       description: p.description,
       price: p.price === null ? '' : String(p.price),
+      category: p.category || 'DISCORD_BOTS',
+      imageUrl: p.imageUrl || '',
       active: p.active,
     });
   };
@@ -68,6 +72,8 @@ export function ShopProductsPage() {
           description: form.description,
           price: price ?? null,
           active: form.active,
+          category: form.category,
+          imageUrl: form.imageUrl.trim() || null,
         });
       } else {
         await api.createShopProduct(guildId, {
@@ -76,6 +82,8 @@ export function ShopProductsPage() {
           description: form.description,
           price: price ?? null,
           active: form.active,
+          category: form.category,
+          imageUrl: form.imageUrl.trim() || null,
         });
       }
       resetForm();
@@ -149,12 +157,35 @@ export function ShopProductsPage() {
             placeholder="3.99"
           />
         </label>
+        <label className="flex flex-col gap-1 text-xs text-nexus-muted">
+          Category
+          <select
+            value={form.category}
+            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+            className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+          >
+            <option value="DISCORD_BOTS">Discord Bots → 🤖・bots</option>
+            <option value="WEBSITES">Websites → 🖥️・websites</option>
+            <option value="DESIGNS">Designs → 🎨・designs</option>
+            <option value="SERVICES">Services → 💼・services</option>
+            <option value="DIGITAL_PRODUCTS">Digital Products → 📁・portfolio</option>
+          </select>
+        </label>
         <label className="sm:col-span-2 flex flex-col gap-1 text-xs text-nexus-muted">
           Description
           <input
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-nexus-muted">
+          Image URL
+          <input
+            value={form.imageUrl}
+            onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+            className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+            placeholder="https://..."
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-white">
@@ -174,6 +205,31 @@ export function ShopProductsPage() {
               Cancel edit
             </PrimaryButton>
           )}
+          <PrimaryButton
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              void (async () => {
+                setBusy(true);
+                try {
+                  const result = await api.shopSync(guildId);
+                  setError(
+                    null,
+                  );
+                  alert(
+                    `Synced ${result.productsSynced} products across ${result.categories} categories` +
+                      (result.errors?.length ? `\n${result.errors.slice(0, 5).join('\n')}` : ''),
+                  );
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Sync failed');
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+          >
+            Sync Discord
+          </PrimaryButton>
         </div>
       </div>
 
@@ -194,7 +250,12 @@ export function ShopProductsPage() {
                 )}
               </p>
               <p className="truncate text-xs text-nexus-muted">{p.description}</p>
-              <p className="mt-1 text-sm text-nexus-blue">{formatShopPrice(p.price)}</p>
+              <p className="mt-1 text-sm text-nexus-blue">
+                {formatShopPrice(p.price)}
+                {p.category ? (
+                  <span className="ml-2 text-xs text-nexus-muted">· {p.category}</span>
+                ) : null}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <PrimaryButton variant="ghost" disabled={busy} onClick={() => startEdit(p)}>
