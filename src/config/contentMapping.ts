@@ -70,13 +70,13 @@ export const PRODUCT_CATEGORIES: CategoryDefinition[] = [
   },
   {
     key: 'WEBSITES',
-    name: 'Websites',
+    name: 'Website Packages',
     emoji: '🌐',
     channelName: '🖥️・websites',
     shopVisible: true,
     sortOrder: 2,
-    panelBlurb: '> Custom websites & web apps.',
-    selectPlaceholder: '🛒 Επιλέξτε Website',
+    panelBlurb: '> Website packages — Starter έως Custom. NEXUS | DEVELOPMENT',
+    selectPlaceholder: '🛒 Επιλέξτε Website Package',
   },
   {
     key: 'DESIGNS',
